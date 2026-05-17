@@ -69,12 +69,21 @@
             border-color: rgba(255, 255, 255, 0.25);
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         }
+        .card-content {
+            flex-grow: 1;
+            padding-right: 15px;
+        }
         .card h2 {
             margin: 0;
             font-size: 1.25rem;
             font-weight: 500;
             word-break: break-all;
-            padding-right: 15px;
+        }
+        .card p.desc {
+            margin: 0.5rem 0 0 0;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.4;
         }
         .icon {
             background: rgba(255,255,255,0.08);
@@ -108,11 +117,21 @@
     <div class="container">
         <header>
             <h1>專案目錄入口</h1>
-            <p class="subtitle">目前共偵測到 1 個專案</p>
+            <p class="subtitle">目前共偵測到 2 個專案</p>
         </header>
         <div class="grid">
+            <a href="data mermaid/index.html" class="card">
+                <div class="card-content">
+                    <h2>data mermaid</h2>
+                    <p class="desc">資料庫架構圖</p>
+                </div>
+                <div class="icon">➔</div>
+            </a>
             <a href="oceanAI/index.html" class="card">
-                <h2>oceanAI</h2>
+                <div class="card-content">
+                    <h2>oceanAI</h2>
+                    <p class="desc">API數據整理</p>
+                </div>
                 <div class="icon">➔</div>
             </a>
         </div>

@@ -16,10 +16,18 @@ def generate_index():
             # 條件：資料夾內必須要有 index.html 才視為有效專案入口
             index_file = item / "index.html"
             if index_file.exists():
-                projects.append(item.name)
+                note_file = item / "note.txt"
+                note_text = ""
+                if note_file.exists():
+                    try:
+                        with open(note_file, "r", encoding="utf-8") as nf:
+                            note_text = nf.read().strip()
+                    except Exception as e:
+                        print(f"無法讀取 {note_file}: {e}")
+                projects.append({"name": item.name, "note": note_text})
                 
     # 依字母順序排序專案
-    projects.sort()
+    projects.sort(key=lambda x: x["name"])
     
     # ==========================================
     # HTML 與 CSS 樣式模板 (深色玻璃擬物化風格)
@@ -95,12 +103,21 @@ def generate_index():
             border-color: rgba(255, 255, 255, 0.25);
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         }}
+        .card-content {{
+            flex-grow: 1;
+            padding-right: 15px;
+        }}
         .card h2 {{
             margin: 0;
             font-size: 1.25rem;
             font-weight: 500;
             word-break: break-all;
-            padding-right: 15px;
+        }}
+        .card p.desc {{
+            margin: 0.5rem 0 0 0;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.4;
         }}
         .icon {{
             background: rgba(255,255,255,0.08);
@@ -147,9 +164,14 @@ def generate_index():
             </div>"""
     else:
         for proj in projects:
+            p_name = proj["name"]
+            p_note = proj["note"]
+            desc_html = f'\n                    <p class="desc">{p_note}</p>' if p_note else ''
             html_content += f"""
-            <a href="{proj}/index.html" class="card">
-                <h2>{proj}</h2>
+            <a href="{p_name}/index.html" class="card">
+                <div class="card-content">
+                    <h2>{p_name}</h2>{desc_html}
+                </div>
                 <div class="icon">➔</div>
             </a>"""
             

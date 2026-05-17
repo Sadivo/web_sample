@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>GreenRoute AI — API 驅動資料庫關聯圖 (Mermaid)</title>
+<style>
+  body {
+    font-family: 'Segoe UI', '微軟正黑體', Arial, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    margin: 0;
+    padding: 30px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  h1 { color: #93c5fd; margin-bottom: 8px; font-size: 1.8rem; }
+  p { color: #94a3b8; margin-bottom: 30px; font-size: 0.95rem; }
+  
+  .mermaid-container {
+    width: 100%;
+    max-width: 1600px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 40px;
+    overflow: auto; /* 若圖太大可以捲動 */
+    display: flex;
+    justify-content: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+  
+  .instructions {
+    font-size: 0.85rem;
+    color: #cbd5e1;
+    margin-bottom: 20px;
+    background: #2563eb22;
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: 1px solid #2563eb55;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+</style>
+
+<!-- 引入 Mermaid JS (從 CDN) -->
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',           // 使用深色主題搭配背景
+    securityLevel: 'loose',
+    er: {
+      useMaxWidth: false,    // 不要強迫寬度，讓文字保持清晰
+      layoutDirection: 'LR', // 從左到右排列，更適合寬螢幕
+      minEntityWidth: 200,
+      minEntityHeight: 100
+    }
+  });
+</script>
+</head>
+<body>
+
+<h1>🚢 GreenRoute AI — API 驅動資料庫關聯圖</h1>
+<p>依據「API確認表.xlsx」之 SubCategories 所推導出的實體關聯圖 (ER Diagram)</p>
+
+<div class="instructions">
+  <span>💡</span>
+  <span>這是一份由 <strong>Mermaid.js</strong> 動態渲染的連接圖。您可以按住 <code>Ctrl</code> 搭配滑鼠滾輪來放大縮小，查看資料表之間的關聯細節。</span>
+</div>
+
+<div class="mermaid-container">
+<!-- Mermaid 語法區塊 -->
+<pre class="mermaid">
+erDiagram
+    %% ==========================================
+    %% 1. 核心主檔層 (Core Entities)
+    %% ==========================================
+    vessels {
+        TEXT vessel_id PK
+        TEXT imo
+        INTEGER mmsi
+        TEXT name
+        TEXT vessel_type
+        INTEGER teu_capacity
+        FLOAT deadweight_ton
+        FLOAT max_draft
+        FLOAT engine_power_kw
+        TEXT fuel_type
+        FLOAT fuel_efficiency
+        TEXT flag
+        TEXT class_society
+        INTEGER build_year
+        FLOAT max_speed
+        FLOAT min_speed
+        FLOAT draft_limit
+        FLOAT fuel_capacity
+        TEXT ghs_rating
+        INTEGER psc_detentions
+        FLOAT inspection_score
+        BOOLEAN anomaly_flag
+        TEXT anomaly_type
+    }
+
+    ports {
+        TEXT port_id PK
+        TEXT name
+        TEXT country
+        FLOAT max_draft
+        INTEGER berth_count
+        FLOAT port_capacity
+    }
+
+    routes {
+        TEXT route_id PK
+        TEXT origin_port FK
+        TEXT destination_port FK
+        FLOAT distance_nm
+        FLOAT base_duration_hr
+        JSONB chokepoints
+        FLOAT depth_limit
+    }
+
+    voyages {
+        TEXT voyage_id PK
+        TEXT vessel_id FK
+        TEXT route_id FK
+        JSONB port_sequence
+        INTEGER total_legs
+        INTEGER current_leg
+    }
+
+    vessels ||--o{ voyages : "執行航次"
+    routes ||--o{ voyages : "依循航線"
+    ports ||--o{ routes : "起迄港"
+
+    %% ==========================================
+    %% 2. 商業營運層 (Commercial)
+    %% ==========================================
+    contracts {
+        TEXT contract_id PK
+        TEXT vessel_id FK
+        INTEGER commitment_teu
+        INTEGER contract_remaining_teu
+        DATE deadline
+        INTEGER contract_time_window
+        FLOAT penalty_per_teu
+        INTEGER contract_priority
+        FLOAT min_service_level
+        INTEGER slot_quota
+        BOOLEAN schedule_fixed
+        TEXT slot_exchange_rule
+    }
+
+    market_data {
+        BIGSERIAL id PK
+        DATE record_date
+        FLOAT fuel_price
+        TEXT fuel_type
+        FLOAT freight_index
+        FLOAT charter_rate
+        FLOAT carbon_price
+        FLOAT port_fuel_price
+    }
+
+    regulations {
+        TEXT zone_id PK
+        BOOLEAN eca_zone
+        FLOAT emission_limit
+        TEXT fuel_restriction
+        BOOLEAN carbon_tax_applicable
+    }
+
+    vessels ||--o{ contracts : "綁定合約"
+
+    %% ==========================================
+    %% 3. 動態觀測層 (Dynamic Context)
+    %% ==========================================
+    vessel_tracking {
+        BIGSERIAL id PK
+        TEXT vessel_id FK
+        TEXT voyage_id FK
+        TIMESTAMPTZ timestamp
+        FLOAT lat
+        FLOAT lon
+        FLOAT speed_knots
+        FLOAT heading
+        TEXT nav_status
+        TEXT leg_status
+        TEXT next_port
+        TIMESTAMPTZ eta_port
+    }
+
+    environment_obs {
+        BIGSERIAL id PK
+        TIMESTAMPTZ forecast_time
+        FLOAT wind_speed
+        FLOAT wave_height
+        FLOAT current_speed
+        FLOAT visibility
+        BOOLEAN storm_flag
+        FLOAT tide_level
+    }
+
+    risk_events {
+        BIGSERIAL id PK
+        FLOAT geopolitics_risk
+        FLOAT piracy_risk
+        FLOAT bottleneck_density
+        BOOLEAN sanctions_flag
+        TEXT insurance_zone
+        JSONB risk_zone_polygon
+    }
+
+    voyages ||--o{ vessel_tracking : "產生軌跡"
+
+    %% ==========================================
+    %% 4. 引擎預測層 (Engine Outputs)
+    %% ==========================================
+    engine_route_evaluations {
+        BIGSERIAL id PK
+        TEXT voyage_id FK
+        TEXT route_id FK
+        FLOAT delay_probability
+        FLOAT eta_variance
+        FLOAT eta_p90
+        FLOAT fuel_cost
+        FLOAT delay_cost
+        FLOAT penalty_cost
+        FLOAT carbon_cost
+        FLOAT total_cost
+        FLOAT total_risk_score
+        FLOAT segment_eta
+        FLOAT carbon_emission
+        FLOAT profit
+    }
+
+    engine_port_predictions {
+        BIGSERIAL id PK
+        TEXT port_id FK
+        FLOAT expected_wait_time
+        FLOAT congestion_score
+        FLOAT capacity_utilization_port
+        FLOAT overflow_risk
+        FLOAT port_delay_cost
+    }
+
+    voyages ||--o| engine_route_evaluations : "產生預測"
+    ports ||--o{ engine_port_predictions : "港口預測狀態"
+
+</pre>
+</div>
+
+</body>
+</html>
