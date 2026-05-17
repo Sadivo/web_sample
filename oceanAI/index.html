@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>航港大數據 — 資料庫架構圖（含船舶資料整合）</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', '微軟正黑體', Arial, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    min-height: 100vh;
+  }
+
+  header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f2744 100%);
+    padding: 28px 40px 24px;
+    border-bottom: 2px solid #2563eb44;
+  }
+  header h1 { font-size: 1.6rem; font-weight: 700; color: #93c5fd; letter-spacing: 0.02em; }
+  header p  { margin-top: 6px; font-size: 0.9rem; color: #94a3b8; }
+  .badge {
+    display: inline-block; margin-top: 10px; margin-right: 8px;
+    padding: 3px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: 600;
+  }
+  .badge-new  { background: #16a34a22; color: #4ade80; border: 1px solid #16a34a55; }
+  .badge-base { background: #2563eb22; color: #93c5fd; border: 1px solid #2563eb55; }
+  .badge-ship { background: #92400e22; color: #fbbf24; border: 1px solid #92400e55; }
+
+  nav {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    padding: 14px 40px;
+    background: #0f172a;
+    border-bottom: 1px solid #1e293b;
+    position: sticky; top: 0; z-index: 10;
+  }
+  nav button {
+    padding: 6px 16px; border-radius: 6px; border: 1px solid #334155;
+    background: #1e293b; color: #94a3b8; font-size: 0.82rem; cursor: pointer;
+    transition: all 0.15s;
+  }
+  nav button:hover, nav button.active {
+    background: #2563eb; border-color: #2563eb; color: #fff;
+  }
+
+  main { padding: 32px 40px; max-width: 1200px; margin: 0 auto; }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ── 總覽卡片 ── */
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .card:hover { border-color: #2563eb; transform: translateY(-2px); box-shadow: 0 8px 24px #2563eb22; }
+  .card-icon { font-size: 1.6rem; margin-bottom: 10px; }
+  .card-title { font-size: 1rem; font-weight: 700; color: #e2e8f0; margin-bottom: 6px; }
+  .card-subtitle { font-size: 0.78rem; color: #64748b; margin-bottom: 10px; }
+  .card-desc { font-size: 0.83rem; color: #94a3b8; line-height: 1.5; }
+  .card-tag {
+    position: absolute; top: 14px; right: 14px;
+    font-size: 0.68rem; font-weight: 700; padding: 2px 8px;
+    border-radius: 99px;
+  }
+  .tag-new  { background: #16a34a22; color: #4ade80; border: 1px solid #16a34a44; }
+  .tag-base { background: #2563eb22; color: #93c5fd; border: 1px solid #2563eb44; }
+  .tag-ship { background: #92400e22; color: #fbbf24; border: 1px solid #92400e55; }
+
+  /* ── 資料流圖 ── */
+  .flow-diagram {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 28px 24px;
+    margin-bottom: 24px;
+  }
+  .flow-diagram h3 { font-size: 1rem; color: #93c5fd; margin-bottom: 20px; font-weight: 700; }
+  .flow-row {
+    display: flex; align-items: center; flex-wrap: wrap;
+    gap: 8px; margin-bottom: 14px;
+  }
+  .flow-box {
+    padding: 8px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 600;
+    white-space: nowrap;
+  }
+  .flow-arrow { color: #475569; font-size: 1.1rem; }
+  .flow-src   { background: #0f172a; border: 1px solid #475569; color: #94a3b8; }
+  .flow-db    { background: #1e3a5f; border: 1px solid #2563eb66; color: #93c5fd; }
+  .flow-api   { background: #14532d; border: 1px solid #16a34a66; color: #4ade80; }
+
+  /* ── 資料表詳細 ── */
+  .table-detail {
+    background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+    margin-bottom: 20px; overflow: hidden;
+  }
+  .table-header {
+    padding: 16px 20px;
+    display: flex; align-items: center; gap: 12px; cursor: pointer;
+    user-select: none;
+  }
+  .table-header:hover { background: #263349; }
+  .table-icon { font-size: 1.3rem; }
+  .table-name { font-size: 1rem; font-weight: 700; color: #e2e8f0; }
+  .table-desc { font-size: 0.82rem; color: #64748b; margin-left: auto; }
+  .toggle-arrow { color: #475569; transition: transform 0.2s; margin-left: 8px; }
+  .toggle-arrow.open { transform: rotate(90deg); }
+
+  .table-body { display: none; padding: 0 20px 20px; }
+  .table-body.open { display: block; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.83rem; margin-top: 4px; }
+  th {
+    text-align: left; padding: 8px 12px;
+    background: #0f172a; color: #475569;
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+    border-bottom: 1px solid #334155;
+  }
+  td { padding: 9px 12px; border-bottom: 1px solid #1e293b; color: #cbd5e1; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .col-pk  { font-weight: 700; color: #fbbf24; }
+  .col-fk  { color: #a78bfa; }
+  .col-type { color: #38bdf8; font-family: monospace; font-size: 0.78rem; }
+  .col-note { color: #64748b; font-size: 0.78rem; }
+
+  /* ── 欄位標記 badges ── */
+  .ft-raw  { display:inline-block; padding:1px 7px; border-radius:4px; font-size:0.7rem; font-weight:700;
+             background:#14532d33; color:#4ade80; border:1px solid #16a34a44; margin-right:4px; }
+  .ft-calc { display:inline-block; padding:1px 7px; border-radius:4px; font-size:0.7rem; font-weight:700;
+             background:#78350f33; color:#fbbf24; border:1px solid #d9770644; margin-right:4px; }
+  .ft-dup  { display:inline-block; padding:1px 7px; border-radius:4px; font-size:0.7rem; font-weight:700;
+             background:#312e8133; color:#a5b4fc; border:1px solid #6366f144; margin-right:4px; }
+
+  /* ── 欄位 meta 區塊 ── */
+  .field-meta { margin-top:14px; border-top:1px solid #334155; padding-top:12px; display:flex; flex-direction:column; gap:8px; }
+  .meta-row { display:flex; gap:10px; font-size:0.8rem; line-height:1.5; }
+  .meta-label { flex-shrink:0; width:90px; font-weight:700; color:#64748b; }
+  .meta-val { color:#94a3b8; }
+  .meta-val code { background:#0f172a; padding:1px 5px; border-radius:3px; color:#38bdf8; font-size:0.75rem; }
+
+  /* ── 欄位來源總表 ── */
+  .source-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+  .source-table th { padding:9px 14px; text-align:left; background:#0f172a; color:#475569;
+    font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid #334155; }
+  .source-table td { padding:9px 14px; border-bottom:1px solid #1e293b; vertical-align:top; }
+  .source-table tr:hover td { background:#1a2436; }
+  .source-section { background:#1e293b; border:1px solid #334155; border-radius:12px;
+    margin-bottom:20px; overflow:hidden; }
+  .source-section-header { padding:16px 20px; font-size:1rem; font-weight:700; color:#93c5fd;
+    border-bottom:1px solid #334155; }
+
+  /* ── 負責人 ── */
+  .member-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+  }
+  .member-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    padding: 24px 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .member-card.peng { border-top: 3px solid #2563eb; }
+  .member-card.lin  { border-top: 3px solid #d97706; }
+  .member-avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem; font-weight: 800; color: #fff;
+    flex-shrink: 0;
+  }
+  .avatar-peng { background: linear-gradient(135deg, #1d4ed8, #3b82f6); }
+  .avatar-lin  { background: linear-gradient(135deg, #b45309, #f59e0b); }
+  .member-info { display: flex; align-items: center; gap: 16px; }
+  .member-name { font-size: 1.15rem; font-weight: 700; color: #e2e8f0; }
+  .member-role { font-size: 0.8rem; color: #64748b; margin-top: 2px; }
+  .member-dbs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .db-chip {
+    padding: 4px 12px; border-radius: 99px; font-size: 0.78rem; font-weight: 600;
+  }
+  .chip-blue { background: #1d4ed822; color: #93c5fd; border: 1px solid #2563eb44; }
+  .chip-amber { background: #92400e22; color: #fbbf24; border: 1px solid #92400e55; }
+
+  .resp-section {
+    background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+    margin-bottom: 20px; overflow: hidden;
+  }
+  .resp-section-header {
+    padding: 14px 20px; font-size: 0.95rem; font-weight: 700;
+    display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid #334155;
+  }
+  .resp-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+  .resp-table th { padding: 9px 16px; text-align: left; background: #0f172a; color: #475569;
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #334155; }
+  .resp-table td { padding: 10px 16px; border-bottom: 1px solid #1e293b; color: #cbd5e1; vertical-align: middle; }
+  .resp-table tr:last-child td { border-bottom: none; }
+  .resp-table tr:hover td { background: #1a2436; }
+  .owner-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 99px; font-size: 0.77rem; font-weight: 700;
+  }
+  .owner-peng { background: #1d4ed822; color: #93c5fd; border: 1px solid #2563eb44; }
+  .owner-lin  { background: #92400e22; color: #fbbf24; border: 1px solid #92400e55; }
+
+  /* ── 比較表 ── */
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .compare-table th {
+    padding: 12px 16px; text-align: left; background: #0f172a;
+    color: #475569; border-bottom: 2px solid #334155;
+    font-size: 0.78rem; text-transform: uppercase;
+  }
+  .compare-table td { padding: 11px 16px; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+  .compare-table tr:hover td { background: #1a2436; }
+  .check { color: #4ade80; font-size: 1rem; }
+  .cross { color: #f87171; font-size: 1rem; }
+  .new-row td { background: #14532d11; }
+  .new-row td:first-child { border-left: 3px solid #16a34a; }
+
+  footer {
+    text-align: center; padding: 24px; color: #334155; font-size: 0.78rem;
+    border-top: 1px solid #1e293b; margin-top: 40px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🚢 航港大數據 — 資料庫架構規劃</h1>
+  <p>台美航線風險監控系統 · 對應 API v3</p>
+  <span class="badge badge-new">⭐ 新增 5 張關鍵表</span>
+  <span class="badge badge-ship">🚢 整合 shipping.db 3 張船舶表</span>
+</header>
+
+<nav>
+  <button class="active" onclick="switchTab('overview')">📊 總覽</button>
+  <button onclick="switchTab('tables')">📋 資料表詳細</button>
+  <button onclick="switchTab('flow')">🔄 資料流</button>
+  <button onclick="switchTab('fieldmap')">🔍 欄位來源對照</button>
+  <button onclick="switchTab('owners')">👥 負責人</button>
+</nav>
+
+<main>
+
+<!-- ══════════════ 總覽 ══════════════ -->
+<section id="overview" class="section active">
+  <div class="overview-grid">
+
+    <div class="card" onclick="goTable('stations')">
+      <div class="card-tag tag-base">原有</div>
+      <div class="card-icon">📡</div>
+      <div class="card-title">stations</div>
+      <div class="card-subtitle">測站/港口主檔</div>
+      <div class="card-desc">統一存放所有氣象站、浮標、港口的基本資料（名稱、位置）。CWA、NDBC、IOTH 全合在一起。</div>
+    </div>
+
+    <div class="card" onclick="goTable('chokepoints')">
+      <div class="card-tag tag-base">原有</div>
+      <div class="card-icon">🌊</div>
+      <div class="card-title">chokepoints</div>
+      <div class="card-subtitle">瓶頸點主檔</div>
+      <div class="card-desc">全球 28 個重要海峽（台灣海峽、麻六甲、蘇伊士等）的基本資料。</div>
+    </div>
+
+    <div class="card" onclick="goTable('marine_weather_obs')">
+      <div class="card-tag tag-base">原有</div>
+      <div class="card-icon">🌬️</div>
+      <div class="card-title">marine_weather_obs</div>
+      <div class="card-subtitle">氣象海象觀測</div>
+      <div class="card-desc">各測站每小時的風速、波高、氣溫等觀測值，是系統最主要的時序資料。</div>
+    </div>
+
+    <div class="card" onclick="goTable('weather_forecast_series')">
+      <div class="card-tag tag-new">⭐ 新增</div>
+      <div class="card-icon">🔮</div>
+      <div class="card-title">weather_forecast_series</div>
+      <div class="card-subtitle">天氣預報序列</div>
+      <div class="card-desc">某座標未來 48 小時的逐小時預報存檔。API 回傳的預報資料存這裡，不用每次重新抓。</div>
+    </div>
+
+    <div class="card" onclick="goTable('chokepoint_daily')">
+      <div class="card-tag tag-base">原有</div>
+      <div class="card-icon">⚓</div>
+      <div class="card-title">chokepoint_daily</div>
+      <div class="card-subtitle">瓶頸點每日通過量</div>
+      <div class="card-desc">每個海峽每天有幾艘船通過、擁塞指數多少，資料來自 IMF PortWatch。</div>
+    </div>
+
+    <div class="card" onclick="goTable('uscg_port_status')">
+      <div class="card-tag tag-new">⭐ 新增</div>
+      <div class="card-icon">🇺🇸</div>
+      <div class="card-title">uscg_port_status</div>
+      <div class="card-subtitle">美西港口狀態</div>
+      <div class="card-desc">洛杉磯、舊金山、西雅圖等港口是否開放的狀態紀錄，來自 USCG 爬蟲。</div>
+    </div>
+
+    <div class="card" onclick="goTable('navigational_warnings')">
+      <div class="card-tag tag-base">原有</div>
+      <div class="card-icon">⚠️</div>
+      <div class="card-title">navigational_warnings</div>
+      <div class="card-subtitle">航行警報</div>
+      <div class="card-desc">JCG、NGA、MARAD、UKMTO 等機構發布的海事警報紀錄。</div>
+    </div>
+
+    <div class="card" onclick="goTable('typhoons')">
+      <div class="card-tag tag-base">原有</div>
+      <div class="card-icon">🌀</div>
+      <div class="card-title">typhoons</div>
+      <div class="card-subtitle">颱風事件</div>
+      <div class="card-desc">颱風路徑與強度的歷史紀錄，包含 GeoJSON 路徑座標，來自 CWA 與 JTWC。</div>
+    </div>
+
+    <div class="card" onclick="goTable('adiz_events')">
+      <div class="card-tag tag-new">⭐ 新增</div>
+      <div class="card-icon">✈️</div>
+      <div class="card-title">adiz_events</div>
+      <div class="card-subtitle">ADIZ 共機架次</div>
+      <div class="card-desc">國防部每日公告的共機架次紀錄，是台灣海峽地緣風險分數的核心依據。</div>
+    </div>
+
+    <div class="card" onclick="goTable('risk_scores')">
+      <div class="card-tag tag-new">⭐ 新增</div>
+      <div class="card-icon">📈</div>
+      <div class="card-title">risk_scores</div>
+      <div class="card-subtitle">綜合風險分數</div>
+      <div class="card-desc">系統計算好的四分量加權風險分數（天氣+地緣+壅塞+船舶），存下來避免重複計算。</div>
+    </div>
+
+    <div class="card" onclick="goTable('vessels')">
+      <div class="card-tag tag-ship">🚢 shipping.db</div>
+      <div class="card-icon">🛳️</div>
+      <div class="card-title">vessels</div>
+      <div class="card-subtitle">船舶主檔</div>
+      <div class="card-desc">25,617 艘船的 MMSI、IMO、船名、船型、尺寸等基本資料。是計算 vessel_risk 的依據，填補了原本缺失的 0.1 預設值。</div>
+    </div>
+
+    <div class="card" onclick="goTable('ais_positions_summary')">
+      <div class="card-tag tag-ship">🚢 shipping.db</div>
+      <div class="card-icon">📍</div>
+      <div class="card-title">ais_positions_summary</div>
+      <div class="card-subtitle">AIS 每日摘要</div>
+      <div class="card-desc">原始 AIS 有 641 萬筆位置紀錄，這張表存每日各區域的摘要統計（船隻數、平均船速等），不搬原始資料。</div>
+    </div>
+
+    <div class="card" onclick="goTable('vessel_port_calls')">
+      <div class="card-tag tag-ship">🚢 shipping.db</div>
+      <div class="card-icon">⚓</div>
+      <div class="card-title">vessel_port_calls</div>
+      <div class="card-subtitle">台灣港口進出港紀錄</div>
+      <div class="card-desc">合併 tpnet_in（37,604 筆）和 tpnet_out（42,395 筆），涵蓋基隆、高雄、台中、台北等港的進出港記錄。</div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ══════════════ 資料表詳細 ══════════════ -->
+<section id="tables" class="section">
+
+  <div id="t-stations" class="table-detail">
+    <div class="table-header" onclick="toggleTable('stations')">
+      <span class="table-icon">📡</span>
+      <span class="table-name">stations</span>
+      <span class="table-desc">測站/港口主檔（靜態，不常變動）</span>
+      <span class="toggle-arrow" id="arr-stations">▶</span>
+    </div>
+    <div class="table-body" id="body-stations">
+      <table>
+        <tr><th>欄位</th><th>型態</th><th>說明</th></tr>
+        <tr><td class="col-pk">station_id</td><td class="col-type">VARCHAR</td><td>主鍵，測站代碼（如 466881、51101、KL）</td></tr>
+        <tr><td>name</td><td class="col-type">VARCHAR</td><td>測站/港口名稱</td></tr>
+        <tr><td>type</td><td class="col-type">VARCHAR</td><td>weather_station（氣象站）｜ buoy（浮標）｜ port（港口）</td></tr>
+        <tr><td>geom</td><td class="col-type">Geometry</td><td>座標（PostGIS 格式，支援空間查詢）</td></tr>
+        <tr><td>source</td><td class="col-type">VARCHAR</td><td>資料來源：CWA｜NDBC｜IOTH｜CWA_BUOY</td></tr>
+      </table>
+      <div class="field-meta">
+        <div class="meta-row"><span class="meta-label">📥 資料來源</span><span class="meta-val">CWA、NDBC、IOTH 各 API 的靜態站點資訊；人工整理匯入</span></div>
+        <div class="meta-row"><span class="meta-label">🔢 運算欄位</span><span class="meta-val"><code>type</code>（依來源標記）、<code>geom</code>（PostGIS 格式轉換）</span></div>
+        <div class="meta-row"><span class="meta-label">⚠️ 重複欄位</span><span class="meta-val"><code>station_id</code> 同時出現在 <code>marine_weather_obs</code>（作為外鍵）；港口代碼 <code>KL/KH…</code> 也出現在 <code>vessel_port_calls.port_code</code>（同一套編碼系統）</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="t-chokepoints" class="table-detail">
+    <div class="table-header" onclick="toggleTable('chokepoints')">
+      <span class="table-icon">🌊</span>
+      <span class="table-name">chokepoints</span>
+      <span class="table-desc">全球 28 個瓶頸點主檔</span>
+      <span class="toggle-arrow" id="arr-chokepoints">▶</span>
+    </div>
+    <div class="table-body" id="body-chokepoints">
+      <table>
+        <tr><th>欄位</th><th>型態</th><th>說明</th></tr>
+        <tr><td class="col-pk">chokepoint_id</td><td class="col-type">VARCHAR</td><td>主鍵，如 chokepoint10（台灣海峽）</td></tr>
+        <tr><td>name_zh</td><td class="col-type">VARCHAR</td><td>中文名稱</td></tr>
+        <tr><td>name_en</td><td class="col-type">VARCHAR</td><td>英文名稱</td></tr>
+        <tr><td>geom</td><td class="col-type">Geometry</td><td>中心座標</td></tr>
+        <tr><td>is_key_route</td><td class="col-type">BOOLEAN</td><td>是否為台美航線五大關鍵瓶頸點</td></tr>
+      </table>
+      <div class="field-meta">
+        <div class="meta-row"><span class="meta-label">📥 資料來源</span><span class="meta-val">IMF PortWatch 靜態參照表；人工整理匯入</span></div>
+        <div class="meta-row"><span class="meta-label">🔢 運算欄位</span><span class="meta-val"><code>is_key_route</code>（依台美航線五大關鍵點標記）</span></div>
+        <div class="meta-row"><span class="meta-label">⚠️ 重複欄位</span><span class="meta-val"><code>chokepoint_id</code> 同時出現在 <code>chokepoint_daily</code>（作為外鍵）</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="t-marine_weather_obs" class="table-detail">
+    <div class="table-header" onclick="toggleTable('marine_weather_obs')">
+      <span class="table-icon">🌬️</span>
+      <span class="table-name">marine_weather_obs</span>
+      <span class="table-desc">氣象海象時序觀測（核心資料表）</span>
+      <span class="toggle-arrow" id="arr-marine_weather_obs">▶</span>
+    </div>
+    <div class="table-body" id="body-marine_weather_obs">
+      <table>
+        <tr><th>欄位</th><th>型態</th><th>說明</th></tr>
+        <tr><td class="col-pk">id</td><td class="col-type">BIGSERIAL</td><td>自動編號主鍵</td></tr>
+        <tr><td class="col-fk">station_id</td><td class="col-type">VARCHAR</td><td>外鍵，關聯 stations 表</td></tr>
+        <tr><td>obs_time</td><td class="col-type">TIMESTAMPTZ</td><td>觀測時間（含時區）</td></tr>
+        <tr><td>wind_speed</td><td class="col-type">FLOAT</td><td>風速 m/s</td></tr>
+        <tr><td>wind_direction</td><td class="col-type">FLOAT</td><td>風向 degrees</td></tr>
+        <tr><td>wind_gusts</td><td class="col-type">FLOAT</td><td>陣風 m/s</td></tr>
+        <tr><td>wave_height</td><td class="col-type">FLOAT</td><td>有效波高 Hs (m)</td></tr>
+        <tr><td>wave_period</td><td class="col-type">FLOAT</td><td>波浪週期 Tp (s)</td></tr>
+        <tr><td>wave_direction</td><td class="col-type">FLOAT</td><td>波向 degrees</td></tr>
+        <tr><td>air_temp</td><td class="col-type">FLOAT</td><td>氣溫 °C</td></tr>
+        <tr><td>sea_temp</td><td class="col-type">FLOAT</td><td>海溫 °C</td></tr>
+        <tr><td>source</td><td class="col-type">VARCHAR</td><td>資料來源 API（CWA、NDBC、IOTH…）</td></tr>
+      </table>
+      <div class="field-meta">
+        <div class="meta-row"><span class="meta-label">📥 資料來源</span><span class="meta-val">CWA O-A0001-001（即時氣象站）、CWA C-B0024-001（逐小時歷史）、NOAA NDBC realtime2（太平洋浮標）、IOTH Wave/Tide XML（台灣五港）、CWA O-B0075-001（85 站海象浮標）、Open-Meteo Marine（格點補充）</span></div>
+        <div class="meta-row"><span class="meta-label">🔢 運算欄位</span><span class="meta-val">（無）全部為原始觀測值</span></div>
+        <div class="meta-row"><span class="meta-label">⚠️ 重複欄位</span><span class="meta-val"><code>wind_speed</code>、<code>wave_height</code>、<code>air_temp</code> 同時出現在 <code>weather_forecast_series</code>（該表為預報，語意不同）；<code>wave_height</code> 也在 <code>ioth_port_observations</code>；<code>wind_speed</code>、<code>wave_height</code> 是 <code>risk_scores.weather_risk</code> 的計算輸入</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="t-weather_forecast_series" class="table-detail" style="border-color:#16a34a55">
+    <div class="table-header" onclick="toggleTable('weather_forecast_series')">
+      <span class="table-icon">🔮</span>
+      <span class="table-name">weather_forecast_series <span style="color:#4ade80;font-size:0.75rem">⭐ 新增</span></span>
+      <span class="table-desc">48h 逐小時天氣預報序列</span>
+      <span class="toggle-arrow" id="arr-weather_forecast_series">▶</span>
+    </div>
+    <div class="table-body" id="body-weather_forecast_series">
+      <table>
+        <tr><th>欄位</th><th>型態</th><th>說明</th></tr>
+        <tr><td class="col-pk">id</td><td class="col-type">BIGSERIAL</td><td>自動編號主鍵</td></tr>
+        <tr><td>fetched_at</td><td class="col-type">TIMESTAMPTZ</td><td>這筆預報是何時抓的</td></tr>
+        <tr><td>lat / lon</td><td class="col-type">FLOAT</td><td>查詢座標（格點預報無測站 ID）</td></tr>
+        <tr><td>forecast_hour</td><td class="col-type">TIMESTAMPTZ</td><td>這筆資料預報的未來時間點</td></tr>
+        <tr><td>wind_speed</td><td class="col-type">FLOAT</td><td>預報風速 m/s</td></tr>
+        <tr><td>wave_height</td><td class="col-type">FLOAT</td><td>預報波高 m</td></tr>
+        <tr><td>visibility_km</td><td class="col-type">FLOAT</td><td>能見度 km</td></tr>
+        <tr><td>precipitation</td><td class="col-type">FLOAT</td><td>降雨量 mm</td></tr>
+        <tr><td>temperature</td><td class="col-type">FLOAT</td><td>氣溫 °C</td></tr>
+      </table>
+      <div class="field-meta">
+        <div class="meta-row"><span class="meta-label">📥 資料來源</span><span class="meta-val">Open-Meteo Forecast API（forecast_days 參數控制）、Open-Meteo Marine（wave_height）</span></div>
+        <div class="meta-row"><span class="meta-label">🔢 運算欄位</span><span class="meta-val">（無）全部為 API 直接回傳的格點預報值</span></div>
+        <div class="meta-row"><span class="meta-label">⚠️ 重複欄位</span><span class="meta-val"><code>wind_speed</code>、<code>wave_height</code>、<code>temperature</code> 與 <code>marine_weather_obs</code> 同名但語意不同（預報 vs 實測）；<code>visibility_km</code> 與 API 回傳的 <code>weather_snapshots</code> 重複</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="t-chokepoint_daily" class="table-detail">
+    <div class="table-header" onclick="toggleTable('chokepoint_daily')">
+      <span class="table-icon">⚓</span>
+      <span class="table-name">chokepoint_daily</span>
+      <span class="table-desc">每日通過量 + 擁塞指數</span>
+      <span class="toggle-arrow" id="arr-chokepoint_daily">▶</span>
+    </div>
+    <div class="table-body" id="body-chokepoint_daily">
+      <table>
+        <tr><th>欄位</th><th>型態</th><th>說明</th></tr>
+        <tr><td class="col-pk">id</td><td class="col-type">BIGSERIAL</td><td>自動編號主鍵</td></tr>
+        <tr><td class="col-fk">chokepoint_id</td><td class="col-type">VARCHAR</td><td>外鍵，關聯 chokepoints 表</td></tr>
+        <tr><td>obs_date</td><td class="col-type">DATE</td><td>觀測日期</td></tr>
+        <tr><td>status</td><td class="col-type">VARCHAR</td><td>open｜restricted｜unknown</td></tr>
+        <tr><td>n_total</td><td class="col-type">INT</td><td>當日總通過船數</td></tr>
+        <tr><td>n_container</td><td class="col-type">INT</td><td>貨櫃輪數量</td></tr>
+        <tr><td>n_tanker</td><td class="col-type">INT</td><td>油輪數量</td></tr>
+        <tr><td>n_cargo</td><td class="col-type">INT</td><td>散貨輪數量</td></tr>
+        <tr><td>congestion_index</td><td class="col-type">FLOAT</td><td>擁塞指數（今日÷7日均線）&gt;1.2 = 壅塞</td></tr>
+      </table>
+      <div class="field-meta">
+        <div class="meta-row"><span class="meta-label">📥 資料來源</span><span class="meta-val">IMF PortWatch ArcGIS REST API（每週二 9AM ET 更新）</span></div>
+        <div class="meta-row"><span class="meta-label">🔢 運算欄位</span><span class="meta-val"><code>congestion_index</code> = <code>n_total</code> ÷ 過去 7 日 <code>n_total</code> 平均值；<code>status</code> = 由 congestion_index 推導（&gt;1.2→restricted, &lt;0.6→restricted, 其他→open）</span></div>
+        <div class="meta-row"><span class="meta-label">⚠️ 重複欄位</span><span class="meta-val"><code>congestion_index</code> 直接被 <code>risk_scores.congestion_risk</code> 引用（正規化後）；<code>n_total</code> 可與 <code>ais_positions_summary.vessel_count</code> 交叉比對（不同來源，同一概念）</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="t-uscg_port_status" class="table-detail" style="border-color:#16a34a55">
+    <div class="table-header" onclick="toggleTable('uscg_port_status')">
+      <span class="table-icon">🇺🇸</span>
+      <span class="table-name">uscg_port_status <span style="color:#4ade80;font-size:0.75rem">⭐ 新增</span></span>
+      <span class="table-desc">美西港口開放狀態</span>
+      <span class="toggle-arrow" id="arr-uscg_port_status">▶</span>
+    </div>
+    <div class="table-body" id="body-uscg_port_status">
+      <table>
+        <tr><th>欄位</th><th>型態</th><th>說明</th></tr>
+        <tr><td class="col-pk">id</td><td class="col-type">BIGSERIAL</td><td>自動編號主鍵</td></tr>
+        <tr><td>fetched_at</td><td class="col-type">TIMESTAMPTZ</td><td>抓取時間</td></tr>
+        <tr><td>zone</td><td class="col-type">VARCHAR</td><td>LA_LB｜SF｜SEATTLE｜SAN_DIEGO｜HONOLULU</td></tr>
+        <tr><td>port_name</td><td class="col-type">VARCHAR</td><td>港口名稱</td></tr>
+        <tr><td>status</td><td class="col-type">VARCHAR</td><td>open｜closed｜restricted</td></tr>
+        <tr><td>condition</td><td class="col-type">TEXT</td><td>詳細狀態說明文字</td></tr>
+      </table>
+      <div class="field-meta">
+        <div class="meta-row"><span class="meta-label">📥 資料來源</span><span class="meta-val">USCG navcen.uscg.gov HTML 爬蟲（沙盒 IP 可能被 403，部署公網後應正常）</span></div>
+        <div class="meta-row"><span class="meta-label">🔢 運算欄位</span><span class="meta-val">（無）全部為爬蟲直接解析結果</span></div>
+        <div class="meta-row"><span class="meta-label">⚠️ 重複欄位</span><span class="meta-val"><code>port_name</code>、<code>zone</code> 概念上對應 <code>vessel_port_calls</code> 的美西港口，但 USCG 用區域碼（LA_LB）、TPNet 用 port_code（KHH 等），需要人工對照</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="t-navigational_warnings" class="table-detail">
+    <div class="table-header" onclick="toggleTable('navigational_warnings')">
+      <span class="table-icon">⚠️</span>
+      <span class="table-name">navigational_warnings</span>
+      <span class="table-desc">多來源航行警報</span>
+      <span class="toggle-arrow" id="arr-navigational_warnings">▶</span>
+    </div>
+    <div class="table-body" id="body-navigational_warnings">
+      <table>
+        <tr><th>欄位</th><th>型態</th><th>說明</th></tr>
+        <tr><td class="col-pk">warning_id</td><td class="col-type">VARCHAR</td><td>主鍵（來源機構警報編號）</td></tr>
+        <tr><td>source</td><td class="col-type">VARCHAR</td><td>JCG｜NGA｜MARAD｜UKMTO</td></tr>
+        <tr><td>issue_date</td><td class="col-type">TIMESTAMPTZ</td><td>警報發布時間</td></tr>
+        <tr><td>cancel_date</td><td class="col-type">TIMESTAMPTZ</td><td>警報取消時間（NULL = 仍有效）</td></tr>
+        <tr><td>area_name</td><td class="col-type">VARCHAR</td><td>影響區域名稱</td></tr>
+        <tr><td>description</td><td class="col-type">TEXT</td><td>警報內容描述</td></tr>
+        <tr><td>severity</td><td class="col-type">VARCHAR</td><td>info｜warning｜urgent</td></tr>
+      </table>
+      <div class="field-meta">
+        <div class="meta-row"><span class="meta-label">📥 資料來源</span><span class="meta-val">多來源抓取：JCG（日本海上保安廳）、NGA NAVAREA、MARAD（美國海事局）、UKMTO（海灣海事安全）各官方網站；以 scraper 定期同步</span></div>
+        <div class="meta-row"><span class="meta-label">🔢 運算欄位</span><span class="meta-val"><code>severity</code> 為系統依警報關鍵字正規化後的分級（原始各機構措辭不同，非直接欄位）</span></div>
+        <div class="meta-row"><span class="meta-label">⚠️ 重複欄位</span><span class="meta-val"><code>area_name</code> 概念上與 <code>chokepoints.name</code> 重疊（同一海域可能同時出現兩表，需以地理座標比對）；<code>severity</code> 與 <code>risk_scores.risk_level</code> 是不同層次的風險分級（單事件 vs 整體評估）</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="t-typhoons" class="table-detail">
+    <div class="table-header" onclick="toggleTable('typhoons')">
+      <span class="table-icon">🌀</span>
+      <span class="table-name">typhoons</span>
+      <span class="table-desc">颱風路徑與強度紀錄</span>
+      <span class="toggle-arrow" id="arr-typhoons">▶</span>
+    </div>
+    <div class="table-body" id="body-typhoons">
+      <table>
+        <tr><th>欄位</th><th>型態</th><th>說明</th></tr>
+        <tr><td class="col-pk">id</td><td class="col-type">BIGSERIAL</td><td>自動編號主鍵</td></tr>
+        <tr><td>system_id</td><td class="col-type">VARCHAR</td><td>颱風系統編號</td></tr>
+        <tr><td>name</td><td class="col-type">VARCHAR</td><td>颱風名稱</td></tr>
+        <tr><td>obs_time</td><td class="col-type">TIMESTAMPTZ</td><td>觀測時間</td></tr>
+        <tr><td>geom</td><td class="col-type">Geometry</td><td>當下中心座標（PostGIS）</td></tr>
+        <tr><td>max_wind_kt</td><td class="col-type">FLOAT</td><td>最大風速（節）</td></tr>
+        <tr><td>storm_path</td><td class="col-type">JSON</td><td>預報路徑 GeoJSON LineString</td></tr>
+        <tr><td>source</td><td class="col-type">VARCHAR</td><td>CWA｜JTWC</td></tr>
+      </table>
+      <div class="field-meta">
+        <div class="meta-row"><span class="meta-label">📥 資料來源</span><span class="meta-val">CWA（中央氣象署）颱風警報 JSON API；JTWC（美國聯合颱風警報中心）輔助對照</span></div>
+        <div class="meta-row"><span class="meta-label">🔢 運算欄位</span><span class="meta-val"><code>geom</code>（PostGIS Point）由 CWA 回傳的 lat/lon 欄位轉換而來；<code>storm_path</code>（GeoJSON LineString）由 CWA 預報路徑陣列格式化組裝</span></div>
+        <div class="meta-row"><span class="meta-label">⚠️ 重複欄位</span><span class="meta-val"><code>max_wind_kt</code> 與 <code>marine_weather_obs.wind_speed</code> 概念相關但層次不同（颱風中心最大風速 vs 測站實測值）；<code>source</code> 欄名在多表（stations、marine_weather_obs 等）中重複使用，代表相同語意</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="t-adiz_events" class="table-detail" style="border-color:#16a34a55">
+    <div class="table-header" onclick="toggleTable('adiz_events')">
+      <span class="table-icon">✈️</span>
+      <span class="table-name">adiz_events <span style="color:#4ade80;font-size:0.75rem">⭐ 新增</span></span>
+      <span class="table-desc">ADIZ 共機架次日誌（地緣風險核心）</span>
+      <span class="toggle-arrow" id="arr-adiz_events">▶</span>
+    </div>
+    <div class="table-body" id="body-adiz_events">
+      <table>
+        <tr><th>欄位</th><th>型態</th><th>說明</th></tr>
+        <tr><td class="col-pk">id</td><td class="col-type">BIGSERIAL</td><td>自動編號主鍵</td></tr>
+        <tr><td>event_date</td><td class="col-type">DATE</td><td>事件日期（UNIQUE，每日一筆）</td></tr>
+        <tr><td>aircraft_count</td><td class="col-type">INT</td><td>共機總架次</td></tr>
+        <tr><td>aircraft_crossed</td><td class="col-type">INT</td><td>穿越中線架次</td></tr>
+        <tr><td>ship_count</td><td class="col-type">INT</td><td>共艦艘數</td></tr>
+        <tr><td>raw_text</td><td class="col-type">TEXT</td><td>國防部新聞稿全文備份</td></tr>
+      </table>
+      <div class="field-meta">
+        <div class="meta-row"><span class="meta-label">📥 資料來源</span><span class="meta-val">MND（國防部）官網新聞稿 scraping，每日比對更新；原始文字完整備份於 <code>raw_text</code></span></div>
+        <div class="meta-row"><span class="meta-label">🔢 運算欄位</span><span class="meta-val"><code>aircraft_count</code>、<code>aircraft_crossed</code>、<code>ship_count</code> 均由 NLP / 正則表達式解析 <code>raw_text</code> 提取，非 API 直接回傳欄位</span></div>
+        <div class="meta-row"><span class="meta-label">⚠️ 重複欄位</span><span class="meta-val"><code>aircraft_count</code> 以快照形式複製到 <code>risk_scores.adiz_sortie_count</code>（記錄計算當下的架次，非即時關聯）；<code>event_date</code> 是連接 <code>risk_scores</code> 時間維度的橋接鍵</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="t-vessels" class="table-detail" style="border-color:#92400e55">
+    <div class="table-header" onclick="toggleTable('vessels')">
+      <span class="table-icon">🛳️</span>
+      <span class="table-name">vessels <span style="color:#fbbf24;font-size:0.75rem">🚢 shipping.db</span></span>
+      <span class="table-desc">船舶主檔（25,617 艘）</span>
+      <span class="toggle-arrow" id="arr-vessels">▶</span>
+    </div>
+    <div class="table-body" id="body-vessels">
+      <table>
+        <tr><th>欄位</th><th>型態</th><th>說明</th></tr>
+        <tr><td class="col-pk">mmsi</td><td class="col-type">INTEGER</td><td>主鍵，AIS 船舶識別碼（9 位數）</td></tr>
+        <tr><td>imo</td><td class="col-type">INTEGER</td><td>IMO 國際海事組織編號</td></tr>
+        <tr><td>name</td><td class="col-type">TEXT</td><td>船名</td></tr>
+        <tr><td>call_sign</td><td class="col-type">TEXT</td><td>無線電呼號</td></tr>
+        <tr><td>vessel_type</td><td class="col-type">INTEGER</td><td>AIS 船型代碼（數字）</td></tr>
+        <tr><td>vessel_type_label</td><td class="col-type">TEXT</td><td>船型名稱：Cargo（8,394）｜Tanker（4,376）｜其他</td></tr>
+        <tr><td>length_m</td><td class="col-type">INTEGER</td><td>船長 (m)</td></tr>
+        <tr><td>width_m</td><td class="col-type">INTEGER</td><td>船寬 (m)</td></tr>
+        <tr><td>max_draft_m</td><td class="col-type">REAL</td><td>最大吃水 (m)，影響港口可否進入</td></tr>
+        <tr><td>destination</td><td class="col-type">TEXT</td><td>AIS 自報目的港</td></tr>
+        <tr><td>first_seen / last_seen</td><td class="col-type">TEXT</td><td>首次/最後出現時間</td></tr>
+        <tr><td>regions_seen</td><td class="col-type">TEXT</td><td>曾出現的區域列表</td></tr>
+      </table>
+      <div class="field-meta">
+        <div class="meta-row"><span class="meta-label">📥 資料來源</span><span class="meta-val">shipping.db <code>vessels</code> 表（AIS transponder 廣播資料匯整）</span></div>
+        <div class="meta-row"><span class="meta-label">🔢 運算欄位</span><span class="meta-val"><code>vessel_type_label</code> 部分由 AIS 代碼轉換（Type52 等未解碼代碼仍保留原始值）；<code>regions_seen</code> 由 <code>positions</code> 表聚合而來；<code>first_seen</code> / <code>last_seen</code> 同樣由 <code>positions</code> 聚合</span></div>
+        <div class="meta-row"><span class="meta-label">⚠️ 重複欄位</span><span class="meta-val"><code>length_m</code> 也出現在 <code>vessel_port_calls</code>（TPNet 欄位，以 <code>vessels</code> 為準）；<code>vessel_type_label</code> 概念上對應 <code>vessel_port_calls.sta_type</code>（AIS 分類 vs 港務局分類，需人工對照）；<code>mmsi</code> 是連接 <code>risk_scores</code> 的橋接鍵</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="t-ais_positions_summary" class="table-detail" style="border-color:#92400e55">
+    <div class="table-header" onclick="toggleTable('ais_positions_summary')">
+      <span class="table-icon">📍</span>
+      <span class="table-name">ais_positions_summary <span style="color:#fbbf24;font-size:0.75rem">🚢 shipping.db 彙整</span></span>
+      <span class="table-desc">AIS 每日區域摘要（原始 641 萬筆 → 彙整後存此表）</span>
+      <span class="toggle-arrow" id="arr-ais_positions_summary">▶</span>
+    </div>
+    <div class="table-body" id="body-ais_positions_summary">
+      <table>
+        <tr><th>欄位</th><th>型態</th><th>說明</th></tr>
+        <tr><td class="col-pk">id</td><td class="col-type">BIGSERIAL</td><td>自動編號主鍵</td></tr>
+        <tr><td>summary_date</td><td class="col-type">DATE</td><td>統計日期</td></tr>
+        <tr><td>region</td><td class="col-type">VARCHAR</td><td>區域：us_west｜us_east｜asean｜japan｜europe_north｜…</td></tr>
+        <tr><td>vessel_count</td><td class="col-type">INTEGER</td><td>當日該區域出現的船隻總數</td></tr>
+        <tr><td>cargo_count</td><td class="col-type">INTEGER</td><td>貨輪數量</td></tr>
+        <tr><td>tanker_count</td><td class="col-type">INTEGER</td><td>油輪數量</td></tr>
+        <tr><td>avg_sog</td><td class="col-type">FLOAT</td><td>平均船速 (knots)，低於正常值可判斷壅塞</td></tr>
+        <tr><td>anchored_count</td><td class="col-type">INTEGER</td><td>錨泊船隻數（nav_status = 1），異常偏高代表港外等待</td></tr>
+        <tr><td>computed_at</td><td class="col-type">TIMESTAMPTZ</td><td>計算時間</td></tr>
+      </table>
+      <div class="field-meta">
+        <div class="meta-row"><span class="meta-label">📥 資料來源</span><span class="meta-val">shipping.db <code>positions</code> 表（641 萬筆）JOIN <code>vessels</code>，每日批次彙整後寫入</span></div>
+        <div class="meta-row"><span class="meta-label">🔢 運算欄位</span><span class="meta-val">全部欄位均為運算結果：<code>vessel_count</code> = COUNT(DISTINCT mmsi)；<code>cargo_count</code> / <code>tanker_count</code> = 依 vessel_type_label 分組計數；<code>avg_sog</code> = AVG(sog) 排除停泊；<code>anchored_count</code> = COUNT WHERE nav_status=1</span></div>
+        <div class="meta-row"><span class="meta-label">⚠️ 重複欄位</span><span class="meta-val"><code>vessel_count</code> 可與 <code>chokepoint_daily.n_total</code> 交叉比對（IMF PortWatch vs AIS，相同概念不同來源）；<code>region</code> 分類與 <code>vessels.regions_seen</code> 使用同一套區域標籤</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="t-vessel_port_calls" class="table-detail" style="border-color:#92400e55">
+    <div class="table-header" onclick="toggleTable('vessel_port_calls')">
+      <span class="table-icon">⚓</span>
+      <span class="table-name">vessel_port_calls <span style="color:#fbbf24;font-size:0.75rem">🚢 shipping.db</span></span>
+      <span class="table-desc">台灣港口進出港紀錄（tpnet_in + tpnet_out 合併，共 ~80,000 筆）</span>
+      <span class="toggle-arrow" id="arr-vessel_port_calls">▶</span>
+    </div>
+    <div class="table-body" id="body-vessel_port_calls">
+      <table>
+        <tr><th>欄位</th><th>型態</th><th>說明</th></tr>
+        <tr><td class="col-pk">id</td><td class="col-type">BIGSERIAL</td><td>自動編號主鍵</td></tr>
+        <tr><td>visa_no</td><td class="col-type">VARCHAR</td><td>港務局簽證號（原表主鍵）</td></tr>
+        <tr><td>direction</td><td class="col-type">VARCHAR</td><td>in（進港）｜out（出港）</td></tr>
+        <tr><td>vessel_ename</td><td class="col-type">VARCHAR</td><td>船名（英文）</td></tr>
+        <tr><td>vessel_cname</td><td class="col-type">VARCHAR</td><td>船名（中文）</td></tr>
+        <tr><td>port_code</td><td class="col-type">VARCHAR</td><td>港口代碼：KEL（基隆）｜KHH（高雄）｜TXG（台中）｜TPE（台北）｜HUN（花蓮）</td></tr>
+        <tr><td>sta_type</td><td class="col-type">TEXT</td><td>船型：貨櫃輪（最多）｜油輪｜散裝輪｜客輪｜…</td></tr>
+        <tr><td>eta_dt</td><td class="col-type">TIMESTAMPTZ</td><td>預計到港時間</td></tr>
+        <tr><td>act_port_dt</td><td class="col-type">TIMESTAMPTZ</td><td>實際到港時間（進港用）</td></tr>
+        <tr><td>leave_port_dt</td><td class="col-type">TIMESTAMPTZ</td><td>實際離港時間（出港用）</td></tr>
+        <tr><td>wharf_code</td><td class="col-type">VARCHAR</td><td>泊位代碼</td></tr>
+        <tr><td>before_port</td><td class="col-type">VARCHAR</td><td>前一停靠港（進港用）</td></tr>
+        <tr><td>next_port</td><td class="col-type">VARCHAR</td><td>下一停靠港（出港用）</td></tr>
+        <tr><td>length_m</td><td class="col-type">REAL</td><td>船長 (m)</td></tr>
+        <tr><td>gross_toa</td><td class="col-type">REAL</td><td>總噸位</td></tr>
+      </table>
+      <div class="field-meta">
+        <div class="meta-row"><span class="meta-label">📥 資料來源</span><span class="meta-val">shipping.db <code>tpnet_in</code>（37,604 筆）+ <code>tpnet_out</code>（42,395 筆），由台灣港務局港機系統匯出</span></div>
+        <div class="meta-row"><span class="meta-label">🔢 運算欄位</span><span class="meta-val"><code>direction</code> = 根據來源表標記（tpnet_in → 'in'，tpnet_out → 'out'）</span></div>
+        <div class="meta-row"><span class="meta-label">⚠️ 重複欄位</span><span class="meta-val"><code>length_m</code> 與 <code>vessels.length_m</code> 重複（以 vessels 為準）；<code>sta_type</code>（貨櫃輪/油輪…）與 <code>vessels.vessel_type_label</code>（Cargo/Tanker…）同概念但不同分類系統；<code>port_code</code>（KEL/KHH…）與 <code>stations.station_id</code> 的 IOTH port 碼相同（KL/KH…有縮寫差異需注意）</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="t-risk_scores" class="table-detail" style="border-color:#16a34a55">
+    <div class="table-header" onclick="toggleTable('risk_scores')">
+      <span class="table-icon">📈</span>
+      <span class="table-name">risk_scores <span style="color:#4ade80;font-size:0.75rem">⭐ 新增</span></span>
+      <span class="table-desc">四分量加權風險分數計算結果</span>
+      <span class="toggle-arrow" id="arr-risk_scores">▶</span>
+    </div>
+    <div class="table-body" id="body-risk_scores">
+      <table>
+        <tr><th>欄位</th><th>型態</th><th>說明</th></tr>
+        <tr><td class="col-pk">id</td><td class="col-type">BIGSERIAL</td><td>自動編號主鍵</td></tr>
+        <tr><td>computed_at</td><td class="col-type">TIMESTAMPTZ</td><td>計算時間</td></tr>
+        <tr><td>lat / lon</td><td class="col-type">FLOAT</td><td>查詢座標</td></tr>
+        <tr><td>weather_risk</td><td class="col-type">FLOAT</td><td>天氣風險子分數 0~1（Open-Meteo）</td></tr>
+        <tr><td>geopolitics_risk</td><td class="col-type">FLOAT</td><td>地緣風險子分數 0~1（OFAC + MND ADIZ）</td></tr>
+        <tr><td>congestion_risk</td><td class="col-type">FLOAT</td><td>壅塞風險子分數 0~1（IMF PortWatch）</td></tr>
+        <tr><td>vessel_risk</td><td class="col-type">FLOAT</td><td>船舶風險子分數 0~1（外部輸入）</td></tr>
+        <tr><td>total_risk_score</td><td class="col-type">FLOAT</td><td>加權總分 0~1（預設 w1=0.30 w2=0.40 w3=0.20 w4=0.10）</td></tr>
+        <tr><td>risk_level</td><td class="col-type">VARCHAR</td><td>minimal｜low｜medium｜high｜critical</td></tr>
+        <tr><td>dominant_factor</td><td class="col-type">VARCHAR</td><td>主因：weather｜geopolitics｜congestion｜vessel</td></tr>
+        <tr><td>adiz_sortie_count</td><td class="col-type">INT</td><td>計算當下的共機架次（台灣海峽專用）</td></tr>
+      </table>
+      <div class="field-meta">
+        <div class="meta-row"><span class="meta-label">📥 資料來源</span><span class="meta-val">本表所有欄位均為<strong>系統計算產出</strong>，無直接原始 API 對應；各子分數的輸入來源見下方說明</span></div>
+        <div class="meta-row"><span class="meta-label">🔢 運算欄位</span><span class="meta-val">
+          <code>weather_risk</code> ← <code>marine_weather_obs</code>（wind_speed、wave_height、visibility）正規化後加權；
+          <code>geopolitics_risk</code> ← <code>adiz_events.aircraft_count</code> + OFAC 制裁名單 + JWC 保險區 + <code>navigational_warnings.severity</code>；
+          <code>congestion_risk</code> ← <code>chokepoint_daily.congestion_index</code> 正規化；
+          <code>vessel_risk</code> ← <code>vessels</code>（型別、噸位、吃水）+ <code>ais_positions_summary.avg_sog</code>；
+          <code>total_risk_score</code> = w1×weather_risk + w2×geopolitics_risk + w3×congestion_risk + w4×vessel_risk；
+          <code>risk_level</code> = total_risk_score 的分段標記（minimal/low/medium/high/critical）；
+          <code>dominant_factor</code> = 四子分數中最高者
+        </span></div>
+        <div class="meta-row"><span class="meta-label">⚠️ 重複欄位</span><span class="meta-val"><code>adiz_sortie_count</code> 是 <code>adiz_events.aircraft_count</code> 計算當下的快照複製（非外鍵關聯）；<code>lat / lon</code> 為查詢座標，與 <code>stations.lat/lon</code>、<code>chokepoints.lat/lon</code> 概念相同但非外鍵</span></div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ══════════════ 資料流 ══════════════ -->
+<section id="flow" class="section">
+  <div class="flow-diagram">
+    <h3>🌬️ 氣象資料流 (R1)</h3>
+    <div class="flow-row">
+      <span class="flow-box flow-src">Open-Meteo（免費）</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-db">marine_weather_obs</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-api">GET /risk/weather</span>
+    </div>
+    <div class="flow-row">
+      <span class="flow-box flow-src">CWA 氣象站（需 token）</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-db">marine_weather_obs</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-api">GET /risk/weather/archive</span>
+    </div>
+    <div class="flow-row">
+      <span class="flow-box flow-src">Open-Meteo 預報</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-db">weather_forecast_series ⭐</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-api">GET /risk/weather</span>
+    </div>
+    <div class="flow-row">
+      <span class="flow-box flow-src">CWA / JTWC 颱風</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-db">typhoons</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-api">GET /risk/weather</span>
+    </div>
+  </div>
+
+  <div class="flow-diagram">
+    <h3>🌊 海象資料流 (R2)</h3>
+    <div class="flow-row">
+      <span class="flow-box flow-src">IOTH 台灣 5 港</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-db">marine_weather_obs</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-api">GET /risk/ocean</span>
+    </div>
+    <div class="flow-row">
+      <span class="flow-box flow-src">NOAA NDBC 浮標</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-db">marine_weather_obs</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-api">GET /risk/ocean</span>
+    </div>
+    <div class="flow-row">
+      <span class="flow-box flow-src">USCG 美西港口爬蟲</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-db">uscg_port_status ⭐</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-api">GET /risk/ocean</span>
+    </div>
+  </div>
+
+  <div class="flow-diagram">
+    <h3>⚓ 瓶頸點資料流 (R3)</h3>
+    <div class="flow-row">
+      <span class="flow-box flow-src">IMF PortWatch（每週二更新）</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-db">chokepoint_daily</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-api">GET /risk/chokepoint</span>
+    </div>
+  </div>
+
+  <div class="flow-diagram">
+    <h3>🚨 地緣風險資料流 (R4)</h3>
+    <div class="flow-row">
+      <span class="flow-box flow-src">國防部新聞稿爬蟲</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-db">adiz_events ⭐</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-api">GET /risk/geo</span>
+    </div>
+    <div class="flow-row">
+      <span class="flow-box flow-src">JCG / NGA / MARAD / UKMTO</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-db">navigational_warnings</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-api">GET /risk/geo</span>
+    </div>
+  </div>
+
+  <div class="flow-diagram">
+    <h3>📈 風險分數計算流 (Feature)</h3>
+    <div class="flow-row">
+      <span class="flow-box flow-src">marine_weather_obs</span>
+      <span class="flow-arrow">+</span>
+      <span class="flow-box flow-src">adiz_events</span>
+      <span class="flow-arrow">+</span>
+      <span class="flow-box flow-src">chokepoint_daily</span>
+      <span class="flow-arrow">+</span>
+      <span class="flow-box flow-src" style="border-color:#92400e66;color:#fbbf24">vessels 🚢</span>
+      <span class="flow-arrow">→ 計算 →</span>
+      <span class="flow-box flow-db">risk_scores ⭐</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-api">GET /feature/risk_score</span>
+    </div>
+  </div>
+
+  <div class="flow-diagram">
+    <h3>🚢 船舶資料流 (shipping.db 整合)</h3>
+    <div class="flow-row">
+      <span class="flow-box flow-src" style="border-color:#92400e66;color:#fbbf24">shipping.db · vessels</span>
+      <span class="flow-arrow">→ 匯入 →</span>
+      <span class="flow-box flow-db">vessels</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-api">vessel_risk 計算</span>
+    </div>
+    <div class="flow-row">
+      <span class="flow-box flow-src" style="border-color:#92400e66;color:#fbbf24">shipping.db · positions（641 萬筆）</span>
+      <span class="flow-arrow">→ 每日彙整 →</span>
+      <span class="flow-box flow-db">ais_positions_summary</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-api">壅塞輔助指標</span>
+    </div>
+    <div class="flow-row">
+      <span class="flow-box flow-src" style="border-color:#92400e66;color:#fbbf24">shipping.db · tpnet_in / tpnet_out</span>
+      <span class="flow-arrow">→ 合併匯入 →</span>
+      <span class="flow-box flow-db">vessel_port_calls</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box flow-api">港口進出港分析</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ 比較 ══════════════ -->
+<!-- ══════════════ 欄位來源對照 ══════════════ -->
+<section id="fieldmap" class="section">
+  <h2 style="font-size:1.15rem;color:#93c5fd;margin-bottom:6px">🔍 欄位來源對照總表</h2>
+  <p style="color:#64748b;font-size:0.82rem;margin-bottom:22px">
+    各資料表中的欄位依資料來源分類。
+    <span class="ft-raw">RAW</span> 直接從 API 或資料庫取得 ／
+    <span class="ft-calc">COMPUTED</span> 由系統運算產生 ／
+    <span class="ft-dup">DUPLICATE</span> 同一概念出現在多張表
+  </p>
+
+  <!-- ── 氣象 & 環境 ── -->
+  <div class="source-section">
+    <div class="source-section-header">🌬️ 氣象 & 海象來源</div>
+    <table class="source-table">
+      <thead><tr><th>資料表</th><th>欄位</th><th>類型</th><th>原始來源 / 說明</th></tr></thead>
+      <tbody>
+        <tr><td>stations</td><td><code>station_id, name, lat, lon, elevation_m</code></td><td><span class="ft-raw">RAW</span></td><td>CWA 氣象局 / NDBC / IOTH 各自 API</td></tr>
+        <tr><td>stations</td><td><code>source_type</code></td><td><span class="ft-calc">COMPUTED</span></td><td>人工標記（cwa / ndbc / ioth）</td></tr>
+        <tr><td>marine_weather_obs</td><td><code>wind_speed, wind_dir, wave_height, air_temp, sea_temp, visibility, pressure</code></td><td><span class="ft-raw">RAW</span></td><td>CWA API（需 token）、NDBC buoy、IOTH 港口觀測</td></tr>
+        <tr><td>marine_weather_obs</td><td><code>station_id</code></td><td><span class="ft-raw">RAW</span> <span class="ft-dup">DUPLICATE</span></td><td>外鍵，對應 stations 表</td></tr>
+        <tr><td>weather_forecast_series</td><td><code>forecast_time, temperature, wind_speed, wind_dir, wave_height, precipitation, cloud_cover</code></td><td><span class="ft-raw">RAW</span></td><td>Open-Meteo 免費預報 API</td></tr>
+        <tr><td>weather_forecast_series</td><td><code>wind_speed, wave_height</code></td><td><span class="ft-dup">DUPLICATE</span></td><td>同名欄位也在 marine_weather_obs（預報 vs 實測，語意不同）</td></tr>
+        <tr><td>typhoons</td><td><code>system_id, name, obs_time, max_wind_kt, storm_path, source</code></td><td><span class="ft-raw">RAW</span></td><td>CWA 颱風 API / JTWC</td></tr>
+        <tr><td>typhoons</td><td><code>geom</code></td><td><span class="ft-calc">COMPUTED</span></td><td>由 lat/lon 轉換為 PostGIS Point</td></tr>
+        <tr><td>typhoons</td><td><code>storm_path</code></td><td><span class="ft-calc">COMPUTED</span></td><td>由預報路徑陣列組裝成 GeoJSON LineString</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── 瓶頸點 & 壅塞 ── -->
+  <div class="source-section">
+    <div class="source-section-header">⚓ 瓶頸點 & 壅塞來源</div>
+    <table class="source-table">
+      <thead><tr><th>資料表</th><th>欄位</th><th>類型</th><th>原始來源 / 說明</th></tr></thead>
+      <tbody>
+        <tr><td>chokepoints</td><td><code>chokepoint_id, name, lat, lon, region</code></td><td><span class="ft-raw">RAW</span></td><td>人工建立（IMF PortWatch 28 個海峽靜態資料）</td></tr>
+        <tr><td>chokepoint_daily</td><td><code>obs_date, n_total, n_cargo, n_tanker, congestion_index, avg_transit_hours</code></td><td><span class="ft-raw">RAW</span></td><td>IMF PortWatch ArcGIS REST API 每日抓取</td></tr>
+        <tr><td>chokepoint_daily</td><td><code>n_total</code></td><td><span class="ft-dup">DUPLICATE</span></td><td>可與 ais_positions_summary.vessel_count 交叉比對（不同來源，同概念）</td></tr>
+        <tr><td>uscg_port_status</td><td><code>port_code, status, restrictions, raw_html</code></td><td><span class="ft-raw">RAW</span></td><td>USCG 網站 scraping</td></tr>
+        <tr><td>uscg_port_status</td><td><code>status</code></td><td><span class="ft-calc">COMPUTED</span></td><td>由 raw_html 正規化為 open / restricted / closed</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── 地緣政治 & 航行安全 ── -->
+  <div class="source-section">
+    <div class="source-section-header">⚡ 地緣政治 & 航行安全來源</div>
+    <table class="source-table">
+      <thead><tr><th>資料表</th><th>欄位</th><th>類型</th><th>原始來源 / 說明</th></tr></thead>
+      <tbody>
+        <tr><td>adiz_events</td><td><code>event_date, raw_text</code></td><td><span class="ft-raw">RAW</span></td><td>MND 國防部官網新聞稿 scraping</td></tr>
+        <tr><td>adiz_events</td><td><code>aircraft_count, aircraft_crossed, ship_count</code></td><td><span class="ft-calc">COMPUTED</span></td><td>NLP / 正則解析 raw_text 提取</td></tr>
+        <tr><td>adiz_events</td><td><code>aircraft_count</code></td><td><span class="ft-dup">DUPLICATE</span></td><td>快照複製到 risk_scores.adiz_sortie_count</td></tr>
+        <tr><td>navigational_warnings</td><td><code>warning_id, source, issue_date, cancel_date, area_name, description</code></td><td><span class="ft-raw">RAW</span></td><td>JCG / NGA / MARAD / UKMTO scraping</td></tr>
+        <tr><td>navigational_warnings</td><td><code>severity</code></td><td><span class="ft-calc">COMPUTED</span></td><td>關鍵字分析正規化為 info / warning / urgent</td></tr>
+        <tr><td>navigational_warnings</td><td><code>area_name</code></td><td><span class="ft-dup">DUPLICATE</span></td><td>概念上與 chokepoints.name 重疊（需地理比對）</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── 船舶資料 ── -->
+  <div class="source-section">
+    <div class="source-section-header">🚢 船舶資料來源（shipping.db）</div>
+    <table class="source-table">
+      <thead><tr><th>資料表</th><th>欄位</th><th>類型</th><th>原始來源 / 說明</th></tr></thead>
+      <tbody>
+        <tr><td>vessels</td><td><code>mmsi, imo, name, call_sign, vessel_type, length_m, width_m, max_draft_m, destination</code></td><td><span class="ft-raw">RAW</span></td><td>shipping.db vessels 表（AIS transponder 廣播匯整）</td></tr>
+        <tr><td>vessels</td><td><code>vessel_type_label</code></td><td><span class="ft-calc">COMPUTED</span></td><td>由 vessel_type 代碼轉換（Cargo / Tanker / 其他）</td></tr>
+        <tr><td>vessels</td><td><code>regions_seen, first_seen, last_seen</code></td><td><span class="ft-calc">COMPUTED</span></td><td>由 positions 表聚合而來</td></tr>
+        <tr><td>vessels</td><td><code>length_m, vessel_type_label</code></td><td><span class="ft-dup">DUPLICATE</span></td><td>length_m 也在 vessel_port_calls；type_label 對應 vessel_port_calls.sta_type（不同分類系統）</td></tr>
+        <tr><td>ais_positions_summary</td><td><code>summary_date, region</code></td><td><span class="ft-raw">RAW</span></td><td>由 shipping.db positions 表批次彙整（641 萬筆原始記錄）</td></tr>
+        <tr><td>ais_positions_summary</td><td><code>vessel_count, cargo_count, tanker_count, avg_sog, anchored_count</code></td><td><span class="ft-calc">COMPUTED</span></td><td>SQL GROUP BY 聚合計算，非原始資料</td></tr>
+        <tr><td>ais_positions_summary</td><td><code>vessel_count</code></td><td><span class="ft-dup">DUPLICATE</span></td><td>與 chokepoint_daily.n_total 同概念（AIS 自測 vs IMF PortWatch）</td></tr>
+        <tr><td>vessel_port_calls</td><td><code>visa_no, vessel_ename, vessel_cname, port_code, sta_type, eta_dt, act_port_dt, leave_port_dt, wharf_code, before_port, next_port, gross_toa</code></td><td><span class="ft-raw">RAW</span></td><td>台灣港務局港機系統 tpnet_in / tpnet_out</td></tr>
+        <tr><td>vessel_port_calls</td><td><code>direction</code></td><td><span class="ft-calc">COMPUTED</span></td><td>依來源表標記（tpnet_in → 'in'，tpnet_out → 'out'）</td></tr>
+        <tr><td>vessel_port_calls</td><td><code>length_m, sta_type</code></td><td><span class="ft-dup">DUPLICATE</span></td><td>length_m 與 vessels.length_m 重複；sta_type 與 vessel_type_label 同概念</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── 風險分數（全部運算） ── -->
+  <div class="source-section">
+    <div class="source-section-header">📈 風險分數（全部為運算產出）</div>
+    <table class="source-table">
+      <thead><tr><th>資料表</th><th>欄位</th><th>類型</th><th>計算輸入來源</th></tr></thead>
+      <tbody>
+        <tr><td>risk_scores</td><td><code>weather_risk</code></td><td><span class="ft-calc">COMPUTED</span></td><td>marine_weather_obs（wind_speed、wave_height、visibility）</td></tr>
+        <tr><td>risk_scores</td><td><code>geopolitics_risk</code></td><td><span class="ft-calc">COMPUTED</span></td><td>adiz_events.aircraft_count + OFAC 制裁名單 + JWC 保險區 + navigational_warnings.severity</td></tr>
+        <tr><td>risk_scores</td><td><code>congestion_risk</code></td><td><span class="ft-calc">COMPUTED</span></td><td>chokepoint_daily.congestion_index 正規化</td></tr>
+        <tr><td>risk_scores</td><td><code>vessel_risk</code></td><td><span class="ft-calc">COMPUTED</span></td><td>vessels（型別、噸位、吃水）+ ais_positions_summary.avg_sog</td></tr>
+        <tr><td>risk_scores</td><td><code>total_risk_score</code></td><td><span class="ft-calc">COMPUTED</span></td><td>= 0.30×weather + 0.40×geopolitics + 0.20×congestion + 0.10×vessel</td></tr>
+        <tr><td>risk_scores</td><td><code>risk_level</code></td><td><span class="ft-calc">COMPUTED</span></td><td>total_risk_score 分段：&lt;0.2 minimal / 0.2~0.4 low / 0.4~0.6 medium / 0.6~0.8 high / ≥0.8 critical</td></tr>
+        <tr><td>risk_scores</td><td><code>dominant_factor</code></td><td><span class="ft-calc">COMPUTED</span></td><td>四子分數中最高者的名稱（argmax）</td></tr>
+        <tr><td>risk_scores</td><td><code>adiz_sortie_count</code></td><td><span class="ft-calc">COMPUTED</span> <span class="ft-dup">DUPLICATE</span></td><td>快照複製自 adiz_events.aircraft_count（計算當下值）</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</section>
+
+<!-- ══════════════ 負責人 ══════════════ -->
+<section id="owners" class="section">
+
+  <h2 style="font-size:1.15rem;color:#93c5fd;margin-bottom:6px">👥 資料來源負責人</h2>
+  <p style="color:#64748b;font-size:0.82rem;margin-bottom:24px">
+    各資料庫與資料表的錄入與維護負責組員（目前已錄入 2 人）
+  </p>
+
+  <!-- 組員概覽卡片 -->
+  <div class="member-grid">
+
+    <div class="member-card peng">
+      <div class="member-info">
+        <div class="member-avatar avatar-peng">彭</div>
+        <div>
+          <div class="member-name">彭銪</div>
+          <div class="member-role">氣象 / 航行 / 地緣 / 風險分數</div>
+        </div>
+      </div>
+      <div class="member-dbs">
+        <span class="db-chip chip-blue">stations</span>
+        <span class="db-chip chip-blue">chokepoints</span>
+        <span class="db-chip chip-blue">marine_weather_obs</span>
+        <span class="db-chip chip-blue">weather_forecast_series</span>
+        <span class="db-chip chip-blue">chokepoint_daily</span>
+        <span class="db-chip chip-blue">uscg_port_status</span>
+        <span class="db-chip chip-blue">navigational_warnings</span>
+        <span class="db-chip chip-blue">typhoons</span>
+        <span class="db-chip chip-blue">adiz_events</span>
+        <span class="db-chip chip-blue">risk_scores</span>
+      </div>
+    </div>
+
+    <div class="member-card lin">
+      <div class="member-info">
+        <div class="member-avatar avatar-lin">林</div>
+        <div>
+          <div class="member-name">林子玲</div>
+          <div class="member-role">shipping.db 負責人 · 船舶 / AIS / 港口進出港</div>
+        </div>
+      </div>
+      <div class="member-dbs">
+        <span class="db-chip chip-amber">vessels</span>
+        <span class="db-chip chip-amber">ais_positions_summary</span>
+        <span class="db-chip chip-amber">vessel_port_calls</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 詳細對照表：主資料庫 -->
+  <div class="resp-section">
+    <div class="resp-section-header">
+      <div class="member-avatar avatar-peng" style="width:32px;height:32px;font-size:0.85rem">彭</div>
+      彭銪 — 氣象 / 航行 / 地緣 / 風險分數
+    </div>
+    <table class="resp-table">
+      <thead>
+        <tr><th>資料表</th><th>類別</th><th>資料來源</th><th>負責人</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>📡 stations</td>
+          <td>測站/港口主檔</td>
+          <td>CWA、NDBC、IOTH API</td>
+          <td><span class="owner-badge owner-peng">👤 彭銪</span></td>
+        </tr>
+        <tr>
+          <td>🌊 chokepoints</td>
+          <td>瓶頸點主檔</td>
+          <td>IMF PortWatch 靜態資料（人工整理）</td>
+          <td><span class="owner-badge owner-peng">👤 彭銪</span></td>
+        </tr>
+        <tr>
+          <td>🌬️ marine_weather_obs</td>
+          <td>氣象海象觀測</td>
+          <td>CWA、NDBC、IOTH、Open-Meteo</td>
+          <td><span class="owner-badge owner-peng">👤 彭銪</span></td>
+        </tr>
+        <tr>
+          <td>🔮 weather_forecast_series</td>
+          <td>48h 天氣預報序列</td>
+          <td>Open-Meteo Forecast / Marine API</td>
+          <td><span class="owner-badge owner-peng">👤 彭銪</span></td>
+        </tr>
+        <tr>
+          <td>⚓ chokepoint_daily</td>
+          <td>瓶頸點每日通過量</td>
+          <td>IMF PortWatch ArcGIS REST API</td>
+          <td><span class="owner-badge owner-peng">👤 彭銪</span></td>
+        </tr>
+        <tr>
+          <td>🇺🇸 uscg_port_status</td>
+          <td>美西港口狀態</td>
+          <td>USCG navcen.uscg.gov 爬蟲</td>
+          <td><span class="owner-badge owner-peng">👤 彭銪</span></td>
+        </tr>
+        <tr>
+          <td>⚠️ navigational_warnings</td>
+          <td>航行警報</td>
+          <td>JCG、NGA、MARAD、UKMTO 爬蟲</td>
+          <td><span class="owner-badge owner-peng">👤 彭銪</span></td>
+        </tr>
+        <tr>
+          <td>🌀 typhoons</td>
+          <td>颱風事件</td>
+          <td>CWA 颱風 API、JTWC</td>
+          <td><span class="owner-badge owner-peng">👤 彭銪</span></td>
+        </tr>
+        <tr>
+          <td>✈️ adiz_events</td>
+          <td>ADIZ 共機架次</td>
+          <td>MND 國防部新聞稿爬蟲</td>
+          <td><span class="owner-badge owner-peng">👤 彭銪</span></td>
+        </tr>
+        <tr>
+          <td>📈 risk_scores</td>
+          <td>綜合風險分數</td>
+          <td>系統計算產出（各子模組匯整）</td>
+          <td><span class="owner-badge owner-peng">👤 彭銪</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 詳細對照表：shipping.db -->
+  <div class="resp-section">
+    <div class="resp-section-header">
+      <div class="member-avatar avatar-lin" style="width:32px;height:32px;font-size:0.85rem">林</div>
+      林子玲 — shipping.db（船舶資料庫）
+    </div>
+    <table class="resp-table">
+      <thead>
+        <tr><th>資料表</th><th>類別</th><th>資料來源</th><th>負責人</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>🛳️ vessels</td>
+          <td>船舶主檔</td>
+          <td>AIS transponder 廣播資料匯整（25,617 艘）</td>
+          <td><span class="owner-badge owner-lin">👤 林子玲</span></td>
+        </tr>
+        <tr>
+          <td>📍 ais_positions_summary</td>
+          <td>AIS 每日區域摘要</td>
+          <td>shipping.db positions 表（641 萬筆）批次彙整</td>
+          <td><span class="owner-badge owner-lin">👤 林子玲</span></td>
+        </tr>
+        <tr>
+          <td>⚓ vessel_port_calls</td>
+          <td>台灣港口進出港紀錄</td>
+          <td>台灣港務局港機系統 tpnet_in / tpnet_out（~80,000 筆）</td>
+          <td><span class="owner-badge owner-lin">👤 林子玲</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</section>
+
+</main>
+
+<footer>
+  航港大數據風險監控系統 · 資料庫架構規劃 v1.0 · 2026-05-16
+</footer>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function toggleTable(name) {
+  const body = document.getElementById('body-' + name);
+  const arr  = document.getElementById('arr-' + name);
+  const open = body.classList.toggle('open');
+  arr.classList.toggle('open', open);
+}
+
+function goTable(name) {
+  // 切到資料表頁
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tables').classList.add('active');
+  document.querySelectorAll('nav button')[1].classList.add('active');
+  // 展開對應的表
+  const body = document.getElementById('body-' + name);
+  const arr  = document.getElementById('arr-' + name);
+  if (body && !body.classList.contains('open')) {
+    body.classList.add('open');
+    arr.classList.add('open');
+  }
+  // 滾動到對應位置
+  setTimeout(() => {
+    const el = document.getElementById('t-' + name);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 50);
+}
+</script>
+</body>
+</html>
