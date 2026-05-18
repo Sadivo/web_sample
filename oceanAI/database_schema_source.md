@@ -22,6 +22,10 @@
 | `vessels` | 🚢 shipping.db | 🛳️ | **船舶主檔**：25,617 艘船的基本資料。 |
 | `ais_positions_summary`| 🚢 shipping.db | 📍 | **AIS 每日摘要**：每日各區域的摘要統計，不搬原始資料。 |
 | `vessel_port_calls` | 🚢 shipping.db | ⚓ | **台灣港口進出港紀錄**：合併 tpnet_in/out 進出港記錄。 |
+| `bunker_prices` | ⭐ 新增 | ⛽ | **港口燃油現貨價格**：高雄、洛杉磯、紐約、長灘等港口逐日燃油報價（OilMonster 爬蟲）。 |
+| `freight_indices` | ⭐ 新增 | 📦 | **運價指數**：Freightos FBX 全球及台美航線逐日運價指數。 |
+| `carbon_factors` | ⭐ 新增 | 🌿 | **燃料碳排係數靜態表**：MEPC.391(81) 規定的 32+ 種燃料 WtW/TtW Cf 值。 |
+| `regulatory_zones` | ⭐ 新增 | 📋 | **排放管制區法規靜態表**：NAECA、MARPOL Annex VI 及台灣航港局低硫規範。 |
 
 ---
 
@@ -235,6 +239,80 @@
 - **Metadata**:
   - **📥 資料來源**: shipping.db `tpnet_in`（37,604 筆）與 `tpnet_out`（42,395 筆），原始來源為台灣港務局 TPNET 港機系統。
 
+### 2.14 `bunker_prices` (港口燃油現貨價格) ⭐
+- **類型**: 時序資料，工作日每日更新
+- **欄位定義**:
+  | 欄位 | 型態 | 鍵 | 說明 |
+  | --- | --- | --- | --- |
+  | `id` | BIGSERIAL | PK | 自動編號主鍵 |
+  | `fetched_at` | TIMESTAMPTZ | | 爬蟲抓取時間 |
+  | `price_date` | DATE | | 報價所屬日期（OilMonster 頁面日期） |
+  | `port_name` | VARCHAR | | 港口名稱（Kaohsiung / Los_Angeles / New_York / Long_Beach） |
+  | `fuel_type` | VARCHAR | | 燃料類型（VLSFO \| MGO \| IFO380 \| HSFO \| LSMGO \| ULSFO \| IFO180） |
+  | `price_usd_per_mt` | FLOAT | | 燃油現貨價格（美元 / 公噸） |
+  | `source_url` | VARCHAR | | 資料來源 URL |
+- **Metadata**:
+  - **📥 資料來源**: OilMonster 爬蟲（高雄、洛杉磯、紐約、長灘）。實際抓取確認可取得：IFO 380、MGO、VLSFO、HSFO、LSMGO 0.1%、ULSFO 等。Ship & Bunker 台灣港口頁有登入牆，已以 OilMonster 替代。
+  - **🔢 運算欄位**: （無）全部為爬蟲直接解析結果。
+  - **⚠️ 重複欄位**: `port_name` 中的 Kaohsiung 可與 `vessel_port_calls.port_code = KHH` 對應；`fuel_type` 與 `carbon_factors.fuel_type` 形成 FK 關係（碳排計算時使用）。
+  - **💡 備註**: Long Beach 最近可用日期較舊（2024-10）；Kaohsiung 最新（2026-05）。建議加欄位 `is_stale BOOLEAN` 標記資料新鮮度。
+
+### 2.15 `freight_indices` (運價指數) ⭐
+- **類型**: 時序資料，工作日每日更新
+- **欄位定義**:
+  | 欄位 | 型態 | 鍵 | 說明 |
+  | --- | --- | --- | --- |
+  | `id` | BIGSERIAL | PK | 自動編號主鍵 |
+  | `fetched_at` | TIMESTAMPTZ | | 爬蟲抓取時間 |
+  | `index_code` | VARCHAR | | 指數代碼（FBX / FBX01 / FBX02 / FBX03 / FBX04） |
+  | `route_name` | TEXT | | 航線名稱（如 China/East Asia → North America West Coast） |
+  | `value_usd_per_feu` | FLOAT | | 運價（美元 / FEU） |
+  | `change_percent` | FLOAT | | 與前期相比變動百分比 |
+  | `source` | VARCHAR | | 資料來源（Freightos_FBX \| SCFI） |
+- **Metadata**:
+  - **📥 資料來源**: Freightos FBX 爬蟲（已成功）；SCFI 公開頁有航線名稱、單位，但運價空白需登入，暫不列入。Freightos 方法論涵蓋高雄，可作台美航線公開代理指標。
+  - **🔢 運算欄位**: （無）全部為爬蟲直接解析結果。
+  - **⚠️ 重複欄位**: `route_name` 中 FBX01（西岸）/ FBX03（東岸）與專案台美航線研究直接對應；`value_usd_per_feu` 可與燃油成本合併計算運輸總費用。
+  - **💡 備註**: FBX 僅有 East Asia 籃子（含台灣），非台灣單獨數字；若需更精確需付費訂閱 API。
+
+### 2.16 `carbon_factors` (燃料碳排係數靜態參照表) ⭐
+- **類型**: 靜態，IMO 修訂時才更新（約每 3~5 年）
+- **欄位定義**:
+  | 欄位 | 型態 | 鍵 | 說明 |
+  | --- | --- | --- | --- |
+  | `fuel_type` | VARCHAR | PK | 燃料類型（VLSFO / MGO / LNG / Methanol / HFO…） |
+  | `cf_wtw` | FLOAT | | Well-to-Wake 碳排係數（gCO₂eq / gFuel） |
+  | `cf_ttw` | FLOAT | | Tank-to-Wake 碳排係數（gCO₂eq / gFuel） |
+  | `unit` | VARCHAR | | 單位說明（gCO2eq/gFuel） |
+  | `imo_doc` | VARCHAR | | 來源文件（MEPC.391(81)） |
+  | `updated_at` | DATE | | 係數最後更新日期 |
+- **Metadata**:
+  - **📥 資料來源**: MEPC.391(81) 免費 PDF（32 種燃料 WtW Cf 係數），人工整理一次性匯入。
+  - **🔢 運算欄位**: （無）全部為 IMO 官方係數。
+  - **⚠️ 重複欄位**: `fuel_type` 為 `bunker_prices.fuel_type` 的參照鍵；碳排估算公式：`CO₂ = 燃油消耗量(t) × Cf`。
+  - **💡 備註**: 燃油消耗估算所需輸入（ship_type, draft, speed, wave/wind/current）來自 `vessels` 表與 `marine_weather_obs`，三表結合後可估算 F13（燃油消耗）與 F14/F25（碳排）。
+
+### 2.17 `regulatory_zones` (排放管制區及合規法規靜態參照) ⭐
+- **類型**: 半靜態（法規修訂時更新）
+- **欄位定義**:
+  | 欄位 | 型態 | 鍵 | 說明 |
+  | --- | --- | --- | --- |
+  | `zone_id` | VARCHAR | PK | 區域識別碼（NAECA / TW_PORT / GLOBAL） |
+  | `zone_name` | VARCHAR | | 區域名稱（North American ECA / 台灣港口低硫區 / 全球公海） |
+  | `zone_type` | VARCHAR | | ECA \| port_rule \| global |
+  | `sulfur_limit_pct` | FLOAT | | 含硫量上限（%，ECA = 0.10 / 台灣港口 = 0.50 / 全球 = 0.50） |
+  | `nox_tier` | VARCHAR | | NOx 標準等級（Tier I \| Tier II \| Tier III） |
+  | `applies_to` | VARCHAR | | 適用情境（entering \| at_berth \| all） |
+  | `carbon_tax_applicable`| BOOLEAN | | 是否課碳（歐盟 ETS 轄區 = TRUE；美國 / 台灣 = FALSE） |
+  | `geom` | Geometry | | 管制區地理範圍（PostGIS；GLOBAL 可為 NULL） |
+  | `source_doc` | VARCHAR | | 法規來源（MARPOL Annex VI \| NAECA \| 台灣航港局） |
+  | `effective_date` | DATE | | 生效日期 |
+- **Metadata**:
+  - **📥 資料來源**: NAECA（美國西岸 200 海浬、東岸、墨西哥灣、夏威夷）；MARPOL Annex VI；台灣交通部航港局低硫規範（港內使用 ≤ 0.5% 燃料）；人工整理一次性匯入。
+  - **🔢 運算欄位**: `carbon_tax_applicable`（依制度整理：美國無航運碳稅；EU ETS 僅適用歐洲港口）。
+  - **⚠️ 重複欄位**: `zone_id` 可關聯 `vessel_port_calls.port_code`（靠港時觸發 port_rule 檢核）；ECA 地理範圍可與 `chokepoints.geom` 做空間交集。
+  - **💡 備註**: 含碳燃料估算公式（非 ETS 課稅區使用者可選用）：`含碳價格 = fuel_price + (Cf × carbon_market_price)`；相關係數來自 `carbon_factors`。
+
 ---
 
 ## 3. 資料流 (Data Flow)
@@ -249,6 +327,14 @@
   `MND 爬蟲` -> `adiz_events` -> API `GET /risk/geo`
 - **風險分數計算流**:
   `weather` + `adiz` + `chokepoint` + `vessels` -> 計算 -> `risk_scores` -> API `GET /feature/risk_score`
+- **燃油價格資料流**:
+  `OilMonster 爬蟲` -> `bunker_prices` -> API `GET /feature/fuel_cost`
+- **運價指數資料流**:
+  `Freightos FBX 爬蟲` -> `freight_indices` -> API `GET /feature/freight_rate`
+- **碳排估算資料流**:
+  `carbon_factors`（MEPC 靜態）+ `vessels` + `marine_weather_obs` -> 計算 -> API `GET /feature/carbon_estimate`
+- **燃料策略建議資料流**:
+  `bunker_prices` + `carbon_factors` + `regulatory_zones` + `freight_indices` -> 計算 -> API `GET /feature/fuel_strategy`
 
 ---
 
@@ -263,6 +349,18 @@
 - **職責**: shipping.db 負責人 · 船舶 / AIS / 港口進出港
 - **負責資料庫/表**: 
   - `vessels`, `ais_positions_summary`, `vessel_port_calls`
+
+### 👤 楊映亭 (Yang)
+- **職責**: 燃油市場 / 運價指數 / 碳排合規 / 燃料策略
+- **負責資料庫/表**: 
+  - `bunker_prices`, `freight_indices`, `carbon_factors`, `regulatory_zones`
+- **已完成爬蟲**:
+  - ✅ OilMonster — 高雄、洛杉磯、紐約、長灘港口燃油現貨價（IFO 380 / MGO / VLSFO / HSFO / LSMGO / ULSFO）
+  - ✅ Freightos FBX — 全球 + 台美四條航線逐日運價指數（FBX / FBX01–FBX04）
+- **待辦**:
+  - 🔲 將 MEPC.391(81) Cf 係數人工匯入 `carbon_factors`
+  - 🔲 整理 NAECA / MARPOL / 台灣航港局資料至 `regulatory_zones`
+  - 🔲 實作 API 端點 `GET /feature/fuel_cost`、`GET /feature/carbon_estimate`、`GET /feature/fuel_strategy`
 
 ---
 > 💡 **維護建議**: 未來若有新增資料庫、資料表、爬蟲程式或新進組員，請依照上述結構直接新增章節，統一使用本檔案管理。
