@@ -1,5 +1,84 @@
 import os
 from pathlib import Path
+import json
+import re
+
+def inject_data_viewer(project_dir):
+    """
+    自動掃描子專案目錄下的數據檔案，並將其注入至 index.html 的 body 結尾前。
+    支援的副檔名包含：.md, .csv, .json, .txt, .log, .pdf, .png, .jpg, .jpeg, .gif, .svg
+    每次執行時會自動清理舊的注入區塊並重新注入最新的數據。
+    """
+    index_file = project_dir / "index.html"
+    if not index_file.exists():
+        return
+        
+    valid_exts = {".md", ".csv", ".json", ".txt", ".log", ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".svg"}
+    data_files = []
+    
+    # 遞迴遍歷專案目錄下的所有檔案
+    for file_path in project_dir.rglob("*"):
+        if file_path.is_file():
+            # 排除特定網頁引導檔案與隱藏檔案
+            if file_path.name.lower() in {"index.html", "note.txt"} or file_path.name.startswith("."):
+                continue
+            
+            # 排除特殊排除目錄中的檔案
+            parts = file_path.relative_to(project_dir).parts
+            if any(p.startswith(".") or p in {".git", "__pycache__", "node_modules", "old"} for p in parts):
+                continue
+                
+            if file_path.suffix.lower() in valid_exts:
+                # 轉成相對於子專案目錄的相對路徑，並將 Windows 分隔符 \ 轉成 /
+                rel_path = file_path.relative_to(project_dir).as_posix()
+                data_files.append(rel_path)
+                
+    # 檔案名稱排序
+    data_files.sort()
+    
+    # 讀取 index.html
+    try:
+        with open(index_file, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception as e:
+        print(f"❌ 無法讀取子專案網頁 {index_file}: {e}")
+        return
+
+    # 清除先前可能已注入的舊區塊
+    pattern = r"<!-- DATA_VIEWER_INJECTED_START -->.*?<!-- DATA_VIEWER_INJECTED_END -->"
+    content = re.sub(pattern, "", content, flags=re.DOTALL)
+    
+    # 組裝數據中繼資料 JSON
+    project_meta = {
+        "name": project_dir.name,
+        "files": data_files
+    }
+    project_meta_json = json.dumps(project_meta, ensure_ascii=False, indent=2)
+    # 將 JSON 內容縮排，保持 HTML 代碼美觀
+    indented_meta = "\n".join("      " + line for line in project_meta_json.split("\n"))
+    
+    # 構造注入代碼塊
+    injection_code = f"""<!-- DATA_VIEWER_INJECTED_START -->
+    <link rel="stylesheet" href="../global_data_viewer.css">
+    <script>
+      window.__PROJECT_DATA__ = {indented_meta.strip()};
+    </script>
+    <script src="../global_data_viewer.js"></script>
+<!-- DATA_VIEWER_INJECTED_END -->"""
+
+    # 尋找 </body> 標籤進行注入，若不存在則附加至最末尾
+    if "</body>" in content:
+        content = content.replace("</body>", f"{injection_code}\n</body>")
+    else:
+        content = content + f"\n{injection_code}"
+        
+    # 寫回子專案網頁
+    try:
+        with open(index_file, "w", encoding="utf-8") as f:
+            f.write(content)
+        print(f"  ⚡ 成功為子專案 [{project_dir.name}] 注入數據查看器 (共偵測到 {len(data_files)} 個數據檔案)")
+    except Exception as e:
+        print(f"❌ 無法寫入子專案網頁 {index_file}: {e}")
 
 def generate_index():
     # 獲取當前目錄
@@ -16,6 +95,9 @@ def generate_index():
             # 條件：資料夾內必須要有 index.html 才視為有效專案入口
             index_file = item / "index.html"
             if index_file.exists():
+                # 呼叫數據查看器注入邏輯
+                inject_data_viewer(item)
+                
                 note_file = item / "note.txt"
                 note_text = ""
                 if note_file.exists():
