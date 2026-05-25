@@ -1,853 +1,622 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ocean AI - 賽前審查與優化互動視覺化看板</title>
-  <!-- 導入現代 Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
-  
-  <style>
-    /* CSS 設計系統 - 極光海洋 (Aurora Deep Ocean) 暗黑美學 */
-    :root {
-      --bg-dark: #0a192f;
-      --bg-card: rgba(17, 34, 64, 0.65);
-      --bg-card-hover: rgba(23, 42, 69, 0.8);
-      --border-color: rgba(100, 255, 218, 0.15);
-      --border-color-hover: rgba(100, 255, 218, 0.4);
-      --text-primary: #e6f1ff;
-      --text-secondary: #8892b0;
-      --text-muted: #606a86;
-      
-      /* 霓虹強光色 (Accent Colors) */
-      --cyan: #64ffda;
-      --blue: #0070f3;
-      --orange: #ff6d00;
-      --yellow: #ffd600;
-      --green: #4caf50;
-      
-      --transition-base: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      background: linear-gradient(135deg, var(--bg-dark) 0%, #0c203f 50%, #0f1626 100%);
-      font-family: 'Inter', 'Noto Sans TC', sans-serif;
-      color: var(--text-primary);
-      line-height: 1.6;
-      padding: 40px 20px;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    /* 頂部 Header & 漸層 Logo */
-    header {
-      text-align: center;
-      margin-bottom: 50px;
-      position: relative;
-    }
-
-    .logo-container {
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 12px;
-    }
-
-    .logo-icon {
-      width: 48px;
-      height: 48px;
-      background: linear-gradient(135deg, var(--blue), var(--cyan));
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 0 20px rgba(0, 112, 243, 0.4);
-    }
-
-    .logo-icon svg {
-      width: 28px;
-      height: 28px;
-      fill: var(--text-primary);
-    }
-
-    h1 {
-      font-size: 2.5rem;
-      font-weight: 700;
-      background: linear-gradient(to right, #ffffff 30%, var(--cyan) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      letter-spacing: 1px;
-    }
-
-    .subtitle {
-      color: var(--text-secondary);
-      font-size: 1.1rem;
-      margin-top: 8px;
-      font-weight: 300;
-    }
-
-    .meta-bar {
-      display: flex;
-      justify-content: center;
-      gap: 24px;
-      margin-top: 20px;
-      flex-wrap: wrap;
-    }
-
-    .meta-item {
-      background: rgba(255, 255, 255, 0.05);
-      padding: 6px 16px;
-      border-radius: 30px;
-      font-size: 0.85rem;
-      color: var(--cyan);
-      border: 1px solid rgba(100, 255, 218, 0.1);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .meta-item.countdown {
-      color: var(--orange);
-      border-color: rgba(255, 109, 0, 0.2);
-      font-weight: 500;
-      animation: pulse-border 2s infinite;
-    }
-
-    /* 毛玻璃卡片基板 */
-    .glass-card {
-      background: var(--bg-card);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--border-color);
-      border-radius: 16px;
-      padding: 30px;
-      margin-bottom: 40px;
-      box-shadow: 0 15px 35px -15px rgba(2, 12, 27, 0.6);
-      transition: var(--transition-base);
-    }
-
-    .glass-card:hover {
-      border-color: var(--border-color-hover);
-      box-shadow: 0 20px 40px -15px rgba(100, 255, 218, 0.1);
-    }
-
-    /* 頂部進度看板 & 連動進度條 */
-    .progress-section {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 30px;
-      align-items: center;
-    }
-
-    @media (max-width: 768px) {
-      .progress-section {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .progress-info h2 {
-      font-size: 1.5rem;
-      margin-bottom: 10px;
-      color: #fff;
-    }
-
-    .progress-bar-container {
-      width: 100%;
-      height: 16px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 30px;
-      overflow: hidden;
-      margin-top: 15px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      position: relative;
-    }
-
-    .progress-bar-fill {
-      height: 100%;
-      width: 25%; /* 動態修改 */
-      background: linear-gradient(to right, var(--blue), var(--cyan));
-      border-radius: 30px;
-      transition: width 0.8s cubic-bezier(0.25, 0.8, 0.25, 1);
-      box-shadow: 0 0 10px rgba(100, 255, 218, 0.5);
-    }
-
-    .progress-stats {
-      text-align: center;
-      padding: 20px;
-      background: rgba(255, 255, 255, 0.03);
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .progress-percent {
-      font-size: 2.8rem;
-      font-weight: 700;
-      color: var(--cyan);
-      line-height: 1;
-    }
-
-    .progress-label {
-      color: var(--text-secondary);
-      font-size: 0.85rem;
-      margin-top: 5px;
-    }
-
-    /* Section 標題 */
-    .section-title {
-      font-size: 1.6rem;
-      font-weight: 600;
-      margin-bottom: 25px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      color: #fff;
-      border-left: 4px solid var(--cyan);
-      padding-left: 12px;
-    }
-
-    /* P0 級致命合規雷達區 - 卡片 Grid */
-    .compliance-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 25px;
-      margin-bottom: 40px;
-    }
-
-    @media (max-width: 900px) {
-      .compliance-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .compliance-card {
-      background: rgba(17, 34, 64, 0.45);
-      border: 1px solid rgba(255, 109, 0, 0.15);
-      border-radius: 16px;
-      padding: 24px;
-      position: relative;
-      overflow: hidden;
-      transition: var(--transition-base);
-    }
-
-    .compliance-card:hover {
-      transform: translateY(-5px);
-      border-color: rgba(255, 109, 0, 0.5);
-      box-shadow: 0 10px 25px -10px rgba(255, 109, 0, 0.15);
-    }
-
-    .card-badge {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      font-size: 0.75rem;
-      padding: 4px 10px;
-      border-radius: 30px;
-      font-weight: 600;
-      background: rgba(255, 109, 0, 0.1);
-      color: var(--orange);
-      border: 1px solid rgba(255, 109, 0, 0.25);
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    /* 呼吸燈小圓點 */
-    .pulse-dot {
-      width: 8px;
-      height: 8px;
-      background-color: var(--orange);
-      border-radius: 50%;
-      display: inline-block;
-      animation: pulse-orange 1.8s infinite;
-    }
-
-    .compliance-card h3 {
-      font-size: 1.15rem;
-      color: #fff;
-      margin-bottom: 15px;
-      padding-right: 80px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    /* 卡片頁籤切換 (現況 vs 解決) */
-    .card-tabs {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 15px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 8px;
-    }
-
-    .card-tab {
-      background: none;
-      border: none;
-      color: var(--text-secondary);
-      font-size: 0.85rem;
-      padding: 4px 8px;
-      cursor: pointer;
-      font-family: inherit;
-      transition: var(--transition-base);
-      border-radius: 4px;
-    }
-
-    .card-tab:hover {
-      color: var(--text-primary);
-      background: rgba(255, 255, 255, 0.03);
-    }
-
-    .card-tab.active {
-      color: var(--cyan);
-      font-weight: 500;
-      background: rgba(100, 255, 218, 0.08);
-    }
-
-    .tab-content {
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-      min-height: 80px;
-    }
-
-    .tab-content.hidden {
-      display: none;
-    }
-
-    .text-alert {
-      color: #ff9100;
-      font-weight: 500;
-    }
-
-    .text-success {
-      color: var(--cyan);
-      font-weight: 500;
-    }
-
-    /* 一鍵複製優化文字庫 */
-    .copy-box {
-      background: rgba(2, 12, 27, 0.4);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      margin-bottom: 25px;
-      overflow: hidden;
-    }
-
-    .copy-header {
-      background: rgba(255, 255, 255, 0.03);
-      padding: 12px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .copy-title {
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: var(--cyan);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .btn-copy {
-      background: rgba(100, 255, 218, 0.1);
-      border: 1px solid rgba(100, 255, 218, 0.2);
-      color: var(--cyan);
-      padding: 5px 12px;
-      border-radius: 4px;
-      font-size: 0.8rem;
-      cursor: pointer;
-      font-family: inherit;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: var(--transition-base);
-    }
-
-    .btn-copy:hover {
-      background: rgba(100, 255, 218, 0.25);
-      border-color: var(--cyan);
-    }
-
-    .btn-copy.copied {
-      background: rgba(76, 175, 80, 0.15);
-      border-color: var(--green);
-      color: #81c784;
-    }
-
-    .copy-body {
-      padding: 20px;
-      max-height: 250px;
-      overflow-y: auto;
-      font-family: 'Inter', 'Noto Sans TC', sans-serif;
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-      white-space: pre-wrap;
-      word-break: break-all;
-    }
-
-    /* 滾動條美化 */
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: rgba(2, 12, 27, 0.2);
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(100, 255, 218, 0.15);
-      border-radius: 3px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(100, 255, 218, 0.3);
-    }
-
-    /* 12大 API 特徵看板 Grid */
-    .api-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
-      margin-bottom: 40px;
-    }
-
-    @media (max-width: 900px) {
-      .api-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-    }
-
-    @media (max-width: 600px) {
-      .api-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .api-card {
-      background: rgba(17, 34, 64, 0.4);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      padding: 20px;
-      transition: var(--transition-base);
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      min-height: 140px;
-    }
-
-    .api-card:hover {
-      transform: translateY(-3px);
-      border-color: rgba(0, 112, 243, 0.4);
-      box-shadow: 0 8px 20px -10px rgba(0, 112, 243, 0.3);
-    }
-
-    .api-card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 10px;
-    }
-
-    .api-endpoint {
-      font-family: monospace;
-      font-size: 0.85rem;
-      background: rgba(255, 255, 255, 0.04);
-      padding: 3px 8px;
-      border-radius: 4px;
-      color: var(--text-primary);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .api-status-indicator {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      background-color: var(--green);
-      border-radius: 50%;
-      box-shadow: 0 0 8px var(--green);
-    }
-
-    .api-card-title {
-      font-size: 0.95rem;
-      color: #fff;
-      font-weight: 500;
-      margin-bottom: 8px;
-    }
-
-    .api-card-desc {
-      font-size: 0.8rem;
-      color: var(--text-secondary);
-      margin-bottom: 12px;
-      flex-grow: 1;
-    }
-
-    .api-tags {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .api-tag {
-      font-size: 0.7rem;
-      padding: 2px 8px;
-      border-radius: 4px;
-      background: rgba(100, 255, 218, 0.05);
-      border: 1px solid rgba(100, 255, 218, 0.1);
-      color: var(--cyan);
-    }
-
-    /* 大會附表視覺化 */
-    .table-container {
-      overflow-x: auto;
-      margin-bottom: 25px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.85rem;
-      text-align: left;
-      background: rgba(17, 34, 64, 0.2);
-    }
-
-    th {
-      background: rgba(255, 255, 255, 0.03);
-      color: #fff;
-      font-weight: 600;
-      padding: 12px 16px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    td {
-      padding: 12px 16px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      color: var(--text-secondary);
-      vertical-align: middle;
-    }
-
-    tr:hover td {
-      background: rgba(255, 255, 255, 0.01);
-      color: var(--text-primary);
-    }
-
-    /* 6天 Checklist 看板 */
-    .checklist-container {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 25px;
-    }
-
-    @media (max-width: 900px) {
-      .checklist-container {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .checklist-column {
-      background: rgba(17, 34, 64, 0.35);
-      border: 1px solid rgba(255, 255, 255, 0.03);
-      border-radius: 12px;
-      padding: 20px;
-    }
-
-    .checklist-column h3 {
-      font-size: 1rem;
-      color: #fff;
-      margin-bottom: 15px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      padding-bottom: 8px;
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .column-badge {
-      font-size: 0.75rem;
-      padding: 2px 8px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 20px;
-      color: var(--cyan);
-    }
-
-    .checklist-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      margin-bottom: 14px;
-      cursor: pointer;
-      user-select: none;
-    }
-
-    .checklist-item input[type="checkbox"] {
-      position: absolute;
-      opacity: 0;
-      cursor: pointer;
-      height: 0;
-      width: 0;
-    }
-
-    .checkmark {
-      width: 18px;
-      height: 18px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1.5px solid rgba(255, 255, 255, 0.2);
-      border-radius: 4px;
-      display: inline-block;
-      flex-shrink: 0;
-      position: relative;
-      transition: var(--transition-base);
-      margin-top: 3px;
-    }
-
-    .checklist-item:hover .checkmark {
-      border-color: var(--cyan);
-      box-shadow: 0 0 6px rgba(100, 255, 218, 0.2);
-    }
-
-    .checklist-item input:checked ~ .checkmark {
-      background-color: var(--cyan);
-      border-color: var(--cyan);
-      box-shadow: 0 0 8px rgba(100, 255, 218, 0.4);
-    }
-
-    .checkmark::after {
-      content: "";
-      position: absolute;
-      display: none;
-      left: 5px;
-      top: 1px;
-      width: 5px;
-      height: 10px;
-      border: solid #0a192f;
-      border-width: 0 2px 2px 0;
-      transform: rotate(45deg);
-    }
-
-    .checklist-item input:checked ~ .checkmark::after {
-      display: block;
-    }
-
-    .checklist-text {
-      font-size: 0.88rem;
-      color: var(--text-secondary);
-      transition: var(--transition-base);
-    }
-
-    .checklist-item input:checked ~ .checklist-text {
-      color: var(--text-muted);
-      text-decoration: line-through;
-    }
-
-    /* 動畫定義 */
-    @keyframes pulse-orange {
-      0% { box-shadow: 0 0 0 0 rgba(255, 109, 0, 0.7); }
-      70% { box-shadow: 0 0 0 8px rgba(255, 109, 0, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(255, 109, 0, 0); }
-    }
-
-    @keyframes pulse-border {
-      0% { border-color: rgba(255, 109, 0, 0.2); }
-      50% { border-color: rgba(255, 109, 0, 0.6); box-shadow: 0 0 8px rgba(255, 109, 0, 0.2); }
-      100% { border-color: rgba(255, 109, 0, 0.2); }
-    }
-
-    footer {
-      text-align: center;
-      margin-top: 60px;
-      color: var(--text-muted);
-      font-size: 0.8rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.05);
-      padding-top: 20px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ocean AI 競賽報告書審查與優化問題清單看板</title>
+    <style>
+        /* 簡約清晰的高對比設計語言 */
+        :root {
+            --bg-primary: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --warning: #ea580c;
+            --info: #0284c7;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 24px 16px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* 頂部進度看板 */
+        header {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+
+        .meta-desc {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .progress-container {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-top: 12px;
+        }
+
+        .progress-bar-bg {
+            flex-grow: 1;
+            height: 12px;
+            background-color: #e2e8f0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background-color: var(--success);
+            border-radius: 6px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-main);
+            min-width: 90px;
+        }
+
+        /* 標籤篩選與快速鏈接 */
+        .nav-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .nav-btn {
+            background-color: #cbd5e1;
+            border: none;
+            color: var(--text-main);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .nav-btn:hover {
+            background-color: #94a3b8;
+        }
+
+        /* 嚴重等級標籤 */
+        .badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 4px;
+            color: #ffffff;
+            text-transform: uppercase;
+        }
+
+        .badge.p0 { background-color: var(--danger); }
+        .badge.p1 { background-color: var(--warning); }
+        .badge.p2 { background-color: #eab308; color: #451a03; }
+        .badge.p3 { background-color: var(--success); }
+
+        /* 卡片佈局 */
+        .card-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+        }
+
+        .card:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Checkbox 控制已解決狀態 */
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-top: 4px;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+            width: 22px;
+            height: 22px;
+            cursor: pointer;
+            accent-color: var(--success);
+        }
+
+        .card-content {
+            flex-grow: 1;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .card-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .card-desc {
+            font-size: 14px;
+            color: var(--text-main);
+            margin-bottom: 12px;
+        }
+
+        .card-solution {
+            background-color: #f1f5f9;
+            border-left: 4px solid var(--info);
+            padding: 12px;
+            border-radius: 0 6px 6px 0;
+            font-size: 13.5px;
+            margin-top: 8px;
+        }
+
+        .card-solution strong {
+            color: #0f172a;
+        }
+
+        /* 複製文字區域 */
+        .code-box-container {
+            margin-top: 12px;
+            position: relative;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background-color: #f8fafc;
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #e2e8f0;
+            padding: 6px 12px;
+            border-radius: 6px 6px 0 0;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .copy-btn {
+            background-color: var(--primary);
+            border: none;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            transition: background-color 0.1s ease;
+        }
+
+        .copy-btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .copy-btn.copied {
+            background-color: var(--success);
+        }
+
+        .code-box {
+            padding: 12px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            max-height: 250px;
+            color: #334155;
+        }
+
+        /* 已解決狀態樣式 */
+        .card.resolved {
+            opacity: 0.55;
+            background-color: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+
+        .card.resolved .card-title {
+            text-decoration: line-through;
+            color: var(--text-muted);
+        }
+
+        .card.resolved .card-desc,
+        .card.resolved .card-solution {
+            color: var(--text-muted);
+        }
+
+        /* 底部附表區 */
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 40px;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--border-color);
+            color: #0f172a;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 24px;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            font-size: 13.5px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: #e2e8f0;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        tr:hover {
+            background-color: #f8fafc;
+        }
+
+        /* 響應式微調 */
+        @media (max-width: 640px) {
+            .card {
+                flex-direction: column;
+                gap: 12px;
+            }
+            .checkbox-container {
+                padding-top: 0;
+            }
+        }
+    </style>
 </head>
 <body>
 
-  <div class="container">
-    
-    <!-- 頂部標頭 -->
+<div class="container">
+    <!-- 頂部統計面板 -->
     <header>
-      <div class="logo-container">
-        <div class="logo-icon">
-          <!-- 舵與波浪 SVG -->
-          <svg viewBox="0 0 24 24">
-            <path d="M12,2A10,10,0,0,0,2,12A10,10,0,0,0,12,22A10,10,0,0,0,22,12A10,10,0,0,0,12,2ZM12,4A1.5,1.5,0,0,1,13.5,5.5A1.5,1.5,0,0,1,12,7A1.5,1.5,0,0,1,10.5,5.5A1.5,1.5,0,0,1,12,4ZM5.5,10.5A1.5,1.5,0,0,1,7,12A1.5,1.5,0,0,1,5.5,13.5A1.5,1.5,0,0,1,4,12A1.5,1.5,0,0,1,5.5,10.5ZM12,20A1.5,1.5,0,0,1,10.5,18.5A1.5,1.5,0,0,1,12,17A1.5,1.5,0,0,1,13.5,18.5A1.5,1.5,0,0,1,12,20ZM18.5,13.5A1.5,1.5,0,0,1,17,12A1.5,1.5,0,0,1,18.5,10.5A1.5,1.5,0,0,1,20,12A1.5,1.5,0,0,1,18.5,13.5ZM12,9A3,3,0,1,1,9,12A3,3,0,0,1,12,9Z"/>
-          </svg>
+        <h1>Ocean AI 競賽報告書審查與優化問題清單</h1>
+        <p class="meta-desc">本工具整合了 Claude、Gemini 及 Codex 對預賽報告書的審查意見。人類成員修改 Word 報告書時，可在此勾選追蹤進度，並直接複製優化文字。</p>
+        
+        <div class="progress-container">
+            <div class="progress-text" id="progress-label">已修正：0 / 12</div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progress-bar"></div>
+            </div>
+            <div class="progress-text" id="progress-percent">0%</div>
         </div>
-        <span style="font-size: 1.8rem; font-weight: 700; color: #fff;">Ocean AI</span>
-      </div>
-      <h1>賽前審查與優化互動視覺化看板</h1>
-      <p class="subtitle">第六屆航港大數據創意應用競賽 — 書面報告優化指引</p>
-      
-      <div class="meta-bar">
-        <div class="meta-item">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-          小組角色：Ocean AI 團隊
-        </div>
-        <div class="meta-item">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-          最近更新：2026-05-25
-        </div>
-        <div class="meta-item countdown">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-          距離截止：剩餘 6 天 (5/31 截止)
-        </div>
-      </div>
     </header>
 
-    <!-- 頂部進度條 -->
-    <div class="glass-card">
-      <div class="progress-section">
-        <div class="progress-info">
-          <h2>系統報告書修改進度</h2>
-          <p style="color: var(--text-secondary); font-size: 0.9rem;">此進度條將根據下方「預賽提交前最終修訂 Checklist」的勾選項目即時計算並連動。請在完成相應修改後進行勾選！</p>
-          <div class="progress-bar-container">
-            <div id="progressBar" class="progress-bar-fill"></div>
-          </div>
-        </div>
-        <div class="progress-stats">
-          <div id="progressPercent" class="progress-percent">0%</div>
-          <div class="progress-label">任務完成比例</div>
-        </div>
-      </div>
+    <!-- 快速鏈接導航 -->
+    <div class="nav-links">
+        <button class="nav-btn" onclick="scrollToId('p0-sec')">🔴 P0 致命合規 (4項)</button>
+        <button class="nav-btn" onclick="scrollToId('p1-sec')">🟠 P1 技術一致 (3項)</button>
+        <button class="nav-btn" onclick="scrollToId('p2-sec')">🟡 P2 文字草稿 (3項)</button>
+        <button class="nav-btn" onclick="scrollToId('p3-sec')">🟢 P3 優化加分 (2項)</button>
+        <button class="nav-btn" onclick="scrollToId('copy-sec')">🛠️ 核心起草文字庫</button>
+        <button class="nav-btn" onclick="scrollToId('tables-sec')">📝 大會兩大附表指南</button>
     </div>
 
-    <!-- P0 致命合規雷達區 -->
-    <h2 class="section-title">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-      🔴 P0 級：致命性合規與核心痛點 (必須立即修改)
-    </h2>
+    <!-- 🔴 P0 級：致命性合規與核心痛點 -->
+    <h2 class="section-title" id="p0-sec">🔴 P0 級：致命性合規與核心痛點（提交前必須立即修改）</h2>
+    <div class="card-list">
+        
+        <!-- P0 - 1 -->
+        <div class="card" id="card-1">
+            <div class="checkbox-container">
+                <input type="checkbox" id="chk-1" onchange="toggleCard(1)">
+            </div>
+            <div class="card-content">
+                <div class="card-header">
+                    <span class="badge p0">🔴 P0 致命</span>
+                    <span class="card-title">問題 1：封面隊伍名稱暴露且為測試用垃圾文字</span>
+                </div>
+                <p class="card-desc"><strong>現況</strong>：封面「參賽隊伍」欄位印有 <code>南港展覽館館長掌管...黃仁勳難波萬</code>。<br>
+                <strong>危害</strong>：簡章明文規定「書面報告中不得出現參賽者姓名、學校、科系或足以暴露隊伍身份之資訊」。透露測試垃圾文字不僅不專業，更因暴露身分而面臨直接取消資格之風險。</p>
+                <div class="card-solution">
+                    <strong>修正建議</strong>：<strong>直接刪除封面上的「參賽隊伍：...」這整行字</strong>，保持封面白底黑字、完全匿名，這能完美符合大會的公正隱密評審規範。
+                </div>
+            </div>
+        </div>
+
+        <!-- P0 - 2 -->
+        <div class="card" id="card-2">
+            <div class="checkbox-container">
+                <input type="checkbox" id="chk-2" onchange="toggleCard(2)">
+            </div>
+            <div class="card-content">
+                <div class="card-header">
+                    <span class="badge p0">🔴 P0 致命</span>
+                    <span class="card-title">問題 2：iMarine 資料庫在整份報告中完全未提及（0次）</span>
+                </div>
+                <p class="card-desc"><strong>現況</strong>：目前整篇報告書除了第一章零星提及外，最核心的第四章與第五章對交通部航港局 iMarine 隻字未提。<br>
+                <strong>危害</strong>：在大會配分表中，<strong>「iMarine 資料庫使用」單獨佔有 10% 的配分</strong>！若 0 次提及，此 10% 高分幾乎確定直接零分。</p>
+                <div class="card-solution">
+                    <strong>修正建議</strong>：在第四章「採用數據」段落，強勢植入我們起草的 **「交通部航港局 iMarine 數據庫之深度整合與互補應用」專屬小節**（可於下方起草文字庫中點擊一鍵複製，直接貼回 Word 報告中）。
+                </div>
+            </div>
+        </div>
+
+        <!-- P0 - 3 -->
+        <div class="card" id="card-3">
+            <div class="checkbox-container">
+                <input type="checkbox" id="chk-3" onchange="toggleCard(3)">
+            </div>
+            <div class="card-content">
+                <div class="card-header">
+                    <span class="badge p0">🔴 P0 致命</span>
+                    <span class="card-title">問題 3：作品名稱前後不一致與拼湊痕跡</span>
+                </div>
+                <p class="card-desc"><strong>現況</strong>：封面與摘要寫作品名稱為 <code>OceanAI - 航港智慧助手</code>；但第二章後半段卻出現 <code>GreenRoute AI 對外呈現為三大具體應用模組...</code>。<br>
+                <strong>危害</strong>：多版本草稿拼湊痕跡明顯，會被評審認定寫作態度粗糙。</p>
+                <div class="card-solution">
+                    <strong>修正建議</strong>：
+                    1. <strong>全文統一正名為 `Ocean AI`</strong>（中間保留一格空格更顯大氣）。<br>
+                    2. <strong>處理程式命名衝突</strong>：為了解決後端 API 與資料庫大量使用 <code>GreenRoute</code> 命名問題，在報告第五章中應明確標註 <strong>`GreenRoute` 是底層核心風險評估引擎的開發代號</strong>，而對外呈現的品牌與平台則為 <strong>`Ocean AI`</strong>。這樣既能維持命名一致性，又能體現產品技術厚度！
+                </div>
+            </div>
+        </div>
+
+        <!-- P0 - 4 -->
+        <div class="card" id="card-4">
+            <div class="checkbox-container">
+                <input type="checkbox" id="chk-4" onchange="toggleCard(4)">
+            </div>
+            <div class="card-content">
+                <div class="card-header">
+                    <span class="badge p0">🔴 P0 致命</span>
+                    <span class="card-title">問題 4：第八章「參考文獻」完全空白</span>
+                </div>
+                <p class="card-desc"><strong>現況</strong>：目錄中有「捌、參考文獻」，但報告書該章節正文無任何內容。<br>
+                <strong>危害</strong>：報告書完整性佔評分 30%，參考文獻空白將遭到重扣，且評審無法查驗引用來源。</p>
+                <div class="card-solution">
+                    <strong>修正建議</strong>：直接複製下方起草文字庫中為您整理好的 **10 條標準學術與政策參考文獻**（含 IMO、EU ETS、iMarine 官方連結等標準格式），直接貼回 Word 第八章中。
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 🟠 P1 級：系統實作一致性與技術信用風險 -->
+    <h2 class="section-title" id="p1-sec">🟠 P1 級：系統實作一致性與技術信用風險（強烈建議修改）</h2>
+    <div class="card-list">
+
+        <!-- P1 - 5 -->
+        <div class="card" id="card-5">
+            <div class="checkbox-container">
+                <input type="checkbox" id="chk-5" onchange="toggleCard(5)">
+            </div>
+            <div class="card-content">
+                <div class="card-header">
+                    <span class="badge p1">🟠 P1 信用</span>
+                    <span class="card-title">問題 5：第五章架構與專案實作脫節，面臨信用扣分</span>
+                </div>
+                <p class="card-desc"><strong>現況</strong>：第五章引入了 <code>雙燃料航運數位雙生系統</code>、<code>OpenClaw 代理人框架</code>、<code>靜力裝載層 (KG/GM初穩度計算)</code> 等複雜概念與數學公式。但目前 repo 實作代碼僅完成了 12 個多源風險 API，並無這些複雜模組。<br>
+                <strong>危害</strong>：決賽 Demo 時若無法呈現這些超展開的功能，將被扣上「技術吹噓」的帽子。</p>
+                <div class="card-solution">
+                    <strong>修正建議</strong>：<strong>實施「Open / Private 雙層落實策略」</strong>。在第五章開頭插入一段邊界聲明，說明 <strong>Open Layer (資料 API 平台)</strong> 為本大賽已 100% 實作驗證之 MVP 核心；而 <strong>Private Layer (Agentic智慧決策)</strong> 屬中長期規劃與演算法儲備（起草文字見下方複製區 3）。這樣能完美保全極美觀的數學公式，又展現工程實事求是的誠實精神。
+                </div>
+            </div>
+        </div>
+
+        <!-- P1 - 6 -->
+        <div class="card" id="card-6">
+            <div class="checkbox-container">
+                <input type="checkbox" id="chk-6" onchange="toggleCard(6)">
+            </div>
+            <div class="card-content">
+                <div class="card-header">
+                    <span class="badge p1">🟠 P1 信用</span>
+                    <span class="card-title">問題 6：第二章與第五章的 Layer 架構定義前後矛盾</span>
+                </div>
+                <p class="card-desc"><strong>現況</strong>：第二章定義了四層 Agent 架構（監控、分析、決策、Human-in-the-loop）；而第五章卻突然定義了五層架構（限制層、裝載層、經濟層、感知層等）。<br>
+                <strong>危害</strong>：同一份報告中出現兩套完全不同的系統架構定義，會讓評審判定系統不具真實性。</p>
+                <div class="card-solution">
+                    <strong>修正建議</strong>：統一採用第二章定義的 <strong>Layer 1–4 架構</strong>。第五章若要詳細說明各層物理或數學公式推導，應與第二章的層次命名與功能範圍保持一致。
+                </div>
+            </div>
+        </div>
+
+        <!-- P1 - 7 -->
+        <div class="card" id="card-7">
+            <div class="checkbox-container">
+                <input type="checkbox" id="chk-7" onchange="toggleCard(7)">
+            </div>
+            <div class="card-content">
+                <div class="card-header">
+                    <span class="badge p1">🟠 P1 信用</span>
+                    <span class="card-title">問題 7：報告書中 API 端點數量寫錯且未對齊</span>
+                </div>
+                <p class="card-desc"><strong>現況</strong>：報告書可行性表格中寫「11 個 API 端點全數通過測試」；但專案實作現況已完成並通過驗證 <strong>12 個</strong> 端點，且部分 API 描述與代碼實體名稱不符。</p>
+                <div class="card-solution">
+                    <strong>修正建議</strong>：將「11 個」修正為「12 個」，並與後端已實作的 12 個 API 端點進行名稱與功能的實名對齊（如 <code>GET /risk/weather</code>、<code>GET /risk/chokepoint</code> 等，完整 12 個對齊清單見優化白皮書）。
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 🟡 P2 級：重大文字錯誤與草稿痕跡清理 -->
+    <h2 class="section-title" id="p2-sec">🟡 P2 級：重大文字錯誤與草稿痕跡清理（應修正項目）</h2>
+    <div class="card-list">
+
+        <!-- P2 - 8 -->
+        <div class="card" id="card-8">
+            <div class="checkbox-container">
+                <input type="checkbox" id="chk-8" onchange="toggleCard(8)">
+            </div>
+            <div class="card-content">
+                <div class="card-header">
+                    <span class="badge p2">🟡 P2 重大</span>
+                    <span class="card-title">問題 8：明顯拼字與文字錯誤（包含 Physical 錯拼）</span>
+                </div>
+                <p class="card-desc"><strong>現況</strong>：
+                - 第一章第二節：「導入 Agentic AI 與 <code>Phycial</code> AI 概念」 (Physical 拼錯)。<br>
+                - 第七章：「本專案所開發<code>知</code>系統」 (應為「之」系統)；「實現<code>一直</code>數據的動態清洗」 (應為「異質」數據)。</p>
+                <div class="card-solution">
+                    <strong>修正建議</strong>：全文搜尋並替換修正，確保報告在文字上的嚴謹與專業。
+                </div>
+            </div>
+        </div>
+
+        <!-- P2 - 9 -->
+        <div class="card" id="card-9">
+            <div class="checkbox-container">
+                <input type="checkbox" id="chk-9" onchange="toggleCard(9)">
+            </div>
+            <div class="card-content">
+                <div class="card-header">
+                    <span class="badge p2">🟡 P2 重大</span>
+                    <span class="card-title">問題 9：「三大結構性挑戰」標題與實際內容失衡</span>
+                </div>
+                <p class="card-desc"><strong>現況</strong>：第二章第一節標題寫「三大結構性挑戰」，但下方卻列了 （一）、（二）、（三）、（四） 共四個子節。</p>
+                <div class="card-solution">
+                    <strong>修正建議</strong>：二擇一：將標題改為「四大結構性挑戰」；或是將（一）「台灣航運戰略重要性」移至背景引言說明，讓其餘三節成為完美對稱的「三大結構性挑戰」。
+                </div>
+            </div>
+        </div>
+
+        <!-- P2 - 10 -->
+        <div class="card" id="card-10">
+            <div class="checkbox-container">
+                <input type="checkbox" id="chk-10" onchange="toggleCard(10)">
+            </div>
+            <div class="card-content">
+                <div class="card-header">
+                    <span class="badge p2">🟡 P2 重大</span>
+                    <span class="card-title">問題 10：目錄與正文中仍殘留大量草稿問號與口語語氣</span>
+                </div>
+                <p class="card-desc"><strong>現況</strong>：
+                - 第一章標題：「三、研究的範圍限制限制<code>(?)/研究範圍與限制(?)</code>」等，帶有問號的草稿痕跡殘留。<br>
+                - 全文語氣充斥大量口語化的「我們認為...」、「我們覺得...」。</p>
+                <div class="card-solution">
+                    <strong>修正建議</strong>：
+                    1. 徹底清除所有 <code>(?)</code> 草稿標籤，標題正名為「三、研究範圍與限制」。<br>
+                    2. 將口語人稱「我們認為」等，潤飾為專業第三人稱學術語氣（如：「本研究指出...」、「系統架構實務表明...」）。
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 🟢 P3 級：錦上添花之優化建議 -->
+    <h2 class="section-title" id="p3-sec">🟢 P3 級：錦上添花之優化建議（有餘力加分項）</h2>
+    <div class="card-list">
+
+        <!-- P3 - 11 -->
+        <div class="card" id="card-11">
+            <div class="checkbox-container">
+                <input type="checkbox" id="chk-11" onchange="toggleCard(11)">
+            </div>
+            <div class="card-content">
+                <div class="card-header">
+                    <span class="badge p3">🟢 P3 優化</span>
+                    <span class="card-title">問題 11：缺乏可獨立閱讀之完整「摘要」</span>
+                </div>
+                <p class="card-desc"><strong>現況</strong>：目錄中有「摘要」一頁，但內文正文提取後發現，缺乏一個能將問題背景、作品目標、資料來源、核心方法與完成度進行完整論述的 300 字摘要。</p>
+                <div class="card-solution">
+                    <strong>修正建議</strong>：在目錄前一頁，補入本白皮書起草的 **320 字精美摘要**（可於下方一鍵複製），包含完整大賽加分要素。
+                </div>
+            </div>
+        </div>
+
+        <!-- P3 - 12 -->
+        <div class="card" id="card-12">
+            <div class="checkbox-container">
+                <input type="checkbox" id="chk-12" onchange="toggleCard(12)">
+            </div>
+            <div class="card-content">
+                <div class="card-header">
+                    <span class="badge p3">🟢 P3 優化</span>
+                    <span class="card-title">問題 12：表格目錄無法配合 Word 自動更新</span>
+                </div>
+                <p class="card-desc"><strong>現況</strong>：競賽規定目錄必須包含「圖表目錄」，但正文中的主要比較表多為純文字排版，Word 無法自動辨識生成頁碼。</p>
+                <div class="card-solution">
+                    <strong>修正建議</strong>：在 Word 中將主要表格（雙層架構對比表、Agent 層次表、可行性評估表）插入為正式 Table 物件，套用「表格標題」樣式，再手動或自動生成「表目錄」與「圖目錄」索引。
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 🛠️ 可直接貼回 Word 的「核心優化文字庫」 -->
+    <h2 class="section-title" id="copy-sec">🛠️ 可直接貼回 Word 的「核心優化文字庫」</h2>
     
-    <div class="compliance-grid">
-      
-      <!-- 卡片 1 -->
-      <div class="compliance-card">
-        <span class="card-badge"><span class="pulse-dot"></span>合規危機</span>
-        <h3>1. 違反「隱匿隊伍資訊」規定</h3>
-        <div class="card-tabs">
-          <button class="card-tab active" onclick="switchTab(this, 'c1-problem')">問題現況</button>
-          <button class="card-tab" onclick="switchTab(this, 'c1-solution')">修改方案</button>
+    <!-- 複製 1 -->
+    <div class="code-box-container">
+        <div class="code-header">
+            <span>1. 【摘要 (Abstract)】起草文字 (建議置於目錄前頁，字數約 320 字)</span>
+            <button class="copy-btn" id="btn-copy-1" onclick="copyText('code-1', 'btn-copy-1')">複製文字</button>
         </div>
-        <div id="c1-problem" class="tab-content">
-          目前封面印有垃圾測試文字：<br>
-          <span class="text-alert">"參賽隊伍：南港展覽館館長掌管官方觀光網站綻放萬丈光芒..."</span><br>
-          大會簡章明文要求<b>匿名審查</b>。若以此文字提交，將破壞誠信且面臨直接取消資格的風險。
-        </div>
-        <div id="c1-solution" class="tab-content hidden">
-          建議<span class="text-success">直接刪除「參賽隊伍」這整行字，保持封面完全白底黑字且匿名</span>。<br>
-          僅保留「競賽名稱」、「作品名稱（Ocean AI）」與「年份（中華民國115年5月）」。
-        </div>
-      </div>
-
-      <!-- 卡片 2 -->
-      <div class="compliance-card">
-        <span class="card-badge"><span class="pulse-dot"></span>配分危機 (10%)</span>
-        <h3>2. iMarine 資料庫 0 次提及</h3>
-        <div class="card-tabs">
-          <button class="card-tab active" onclick="switchTab(this, 'c2-problem')">問題現況</button>
-          <button class="card-tab" onclick="switchTab(this, 'c2-solution')">修改方案</button>
-        </div>
-        <div id="c2-problem" class="tab-content">
-          大會評審標準中，<span class="text-alert">「iMarine 資料庫使用」佔 10% 配分</span>，並要求填寫資料來源對照表。<br>
-          目前報告草稿中全寫成了外部 API，iMarine 出現次數為 <b>0</b>，此項評分恐遭直接扣至零分。
-        </div>
-        <div id="c2-solution" class="tab-content hidden">
-          在報告書第四章（採用數據）或第五章中<span class="text-success">植入本看板提供之「iMarine 四大整合論述」</span>，具體說明 WBP 燃油價、裝卸量、泊靠時間、進出船舶數據的互補應用。
-        </div>
-      </div>
-
-      <!-- 卡片 3 -->
-      <div class="compliance-card">
-        <span class="card-badge"><span class="pulse-dot"></span>命名混亂</span>
-        <h3>3. 作品名稱前後矛盾</h3>
-        <div class="card-tabs">
-          <button class="card-tab active" onclick="switchTab(this, 'c3-problem')">問題現況</button>
-          <button class="card-tab" onclick="switchTab(this, 'c3-solution')">修改方案</button>
-        </div>
-        <div id="c3-problem" class="tab-content">
-          封面與摘要使用 <span class="text-alert">OceanAI</span>，而貳章後半段卻留下舊版 <span class="text-alert">GreenRoute AI</span> 名稱，顯示多版本拼湊未加校對，會極大影響評審印象。
-        </div>
-        <div id="c3-solution" class="tab-content hidden">
-          1. 全文統一將作品品牌正名為 <span class="text-success">Ocean AI</span>。<br>
-          2. 將代碼庫中的 <span class="text-success">GreenRoute</span> 巧妙定義為「底層核心風險評估引擎的開發代號」，完美化解代碼與品牌命名衝突。
-        </div>
-      </div>
-
-      <!-- 卡片 4 -->
-      <div class="compliance-card">
-        <span class="card-badge"><span class="pulse-dot"></span>完整性危機 (30%)</span>
-        <h3>4. 參考文獻（第八章）完全空白</h3>
-        <div class="card-tabs">
-          <button class="card-tab active" onclick="switchTab(this, 'c4-problem')">問題現況</button>
-          <button class="card-tab" onclick="switchTab(this, 'c4-solution')">修改方案</button>
-        </div>
-        <div id="c4-problem" class="tab-content">
-          目錄中有「捌、參考文獻」，但<span class="text-alert">正文對應章節完全無內容</span>。報告書完整性配分（30%）將遭嚴重扣分，評審無法查驗引用來源。
-        </div>
-        <div id="c4-solution" class="tab-content hidden">
-          直接將本看板【陸、4】中整理好的 <span class="text-success">10 條標準學術與政策引用文獻</span>（含 iMarine, IMO, EU ETS, 強化學習論文）貼入報告書第八章，瞬間拉滿專業度。
-        </div>
-      </div>
-
-    </div>
-
-    <!-- 核心優化文字庫 -->
-    <h2 class="section-title">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
-      🛠️ 可直接貼回 Word 的「核心優化文字庫」
-    </h2>
-
-    <div class="glass-card">
-      
-      <!-- 文字 1 -->
-      <div class="copy-box">
-        <div class="copy-header">
-          <span class="copy-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-            【目錄前頁】 摘要 (Abstract) 起草文字 - 約 320 字
-          </span>
-          <button class="btn-copy" onclick="copyText('text-abstract', this)">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            <span>複製文字</span>
-          </button>
-        </div>
-        <div id="text-abstract" class="copy-body">全氣候變遷與地緣政治動盪，使現代航運面臨前所未有的營運挑戰。歐盟 ETS 碳費實施、IMO 2050 淨零排放路徑以及紅海危機等突發事件，將綠色合規與航線安全直接轉化為航商的剛性營運成本。然而，現有航港資訊多面臨資料分散、多源孤立且決策嚴重滯後之困境。
+        <div class="code-box" id="code-1">全球氣候變遷與地緣政治動盪，使現代航運面臨前所未有的營運挑戰。歐盟 ETS 碳費實施、IMO 2050 淨零排放路徑以及紅海危機等突發事件，將綠色合規與航線安全直接轉化為航商的剛性營運成本。然而，現有航港資訊多面臨資料分散、多源孤立且決策嚴重滯後之困境。
 
 本專題開發「Ocean AI — 智慧綠色航運風險評估平台」，旨在打破海事資訊孤島。系統深度引進交通部航港局 iMarine (航港發展資料庫平臺) 之權威數據，並 live 整合全球氣象、即時海象、戰略瓶頸點與地緣政治等 15 個以上之異質資料源，建構強大的風險特徵庫（Feature Store）。目前，系統已成功開發並實測驗證 12 個多維度風險 API 端點（開發底層引擎代號為 GreenRoute 核心引擎），實現了「四分量加權風險評估模型」。本系統提供「智慧航線風險評估」與「綠色合規儀表板」等應用，協助航商將傳統被動的「經驗調度」升級為數據驅動的「自適應主動避險」，在兼顧 ESG 合規與航行安全的前提下，大幅提升臺灣航運的國際競爭力與韌性。</div>
-      </div>
+    </div>
 
-      <!-- 文字 2 -->
-      <div class="copy-box">
-        <div class="copy-header">
-          <span class="copy-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-            【第四章】 iMarine 數據整合專屬段落 - 搶拿 10% 配分
-          </span>
-          <button class="btn-copy" onclick="copyText('text-imarine', this)">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            <span>複製文字</span>
-          </button>
+    <!-- 複製 2 -->
+    <div class="code-box-container">
+        <div class="code-header">
+            <span>2. 【第四章】iMarine 數據整合專屬段落 (建議植入「採用數據說明」之後)</span>
+            <button class="copy-btn" id="btn-copy-2" onclick="copyText('code-2', 'btn-copy-2')">複製文字</button>
         </div>
-        <div id="text-imarine" class="copy-body">#### (三)、交通部航港局 iMarine 數據庫之深度整合與互補應用
+        <div class="code-box" id="code-2">#### (三)、交通部航港局 iMarine 數據庫之深度整合與互補應用
 
 本系統（Ocean AI）為建構符合臺灣航商營運與政策實務之決策支援系統，除了即時串接國際環境 API 外，亦深度整合交通部航港局 iMarine (航港發展資料庫平臺) 之權威海事數據。透過 iMarine 數據的基準校正，系統得以精確完成特徵工程（Feature Store）的歷史對齊與模型參數校正。具體整合應用項目如下：
 
@@ -855,44 +624,30 @@
 2. **國際商港貨櫃裝卸量與運能特徵**：為量化臺灣四大國際商港（高雄、基隆、台中、台北）的戰略暴露價值，系統調用 iMarine「快捷查詢/港口 — 國際商港貨櫃裝卸量」之歷史面板數據，將其作為「地緣政治風險指數」在臺灣海峽受擾動時之「供應鏈暴露價值（Value at Risk）」權重參數，精確計算出臺灣半導體與電子出口在航線中斷時的潛在經濟減損。
 3. **泊靠時間與壅塞特徵校正**：利用 iMarine「簡易查詢/船舶 — 24小時泊靠時間分析」之大數據統計，獲取臺灣各港口不同船型的常態性泊靠等待時間基準。此基準用以與系統即時監測到的港口等待時間進行比對，從而精準派生出「港口實質壅塞指數」，支援決策模型做出是否「跳港」或「調整靠港順序」之自適應決策。
 4. **進出臺灣船舶與 AIS 數據互補**：本系統將內部 shipping.db 船舶動態資料，與 iMarine「快捷查詢/船舶 — 進出臺灣各國際商港船舶」之數據進行主鍵（MMSI / IMO Number）關聯，補齊了 25,617 筆船舶之基本靜態特徵（如載重噸 DWT、船型、主機馬力、燃油類型），為自適應降速與避險最佳化模型提供了不可或缺的物理約束參數。</div>
-      </div>
+    </div>
 
-      <!-- 文字 3 -->
-      <div class="copy-box">
-        <div class="copy-header">
-          <span class="copy-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-            【第五章】 Open/Private 雙層定位段落 - 規避技術信用度質疑
-          </span>
-          <button class="btn-copy" onclick="copyText('text-double-layer', this)">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path></svg>
-            <span>複製文字</span>
-          </button>
+    <!-- 複製 3 -->
+    <div class="code-box-container">
+        <div class="code-header">
+            <span>3. 【第五章】Open/Private 雙層定位段落 (建議置於第五章開頭「研究流程與理論依據」處)</span>
+            <button class="copy-btn" id="btn-copy-3" onclick="copyText('code-3', 'btn-copy-3')">複製文字</button>
         </div>
-        <div id="text-double-layer" class="copy-body">#### 💡 本專案系統之「Open / Private 雙層落實策略」與產品定位說明
+        <div class="code-box" id="code-3">#### 💡 本專案系統之「Open / Private 雙層落實策略」與產品定位說明
 
 本研究旨在解決海事環境的複雜變動性，系統架構採 Open（對外開放資料）與 Private（私有商務邏輯）雙層落實策略：
-* **Open Layer（產品一：智慧資料特徵平台）**：以本章「情報感知層」與「動態推演層之 API 接口」為核心。本團隊已 100% 完成 12 個多維度風險 API 端點 的開發、部署與 MVP 實測驗證（開發底層引擎代號為 GreenRoute Engine）。該平台將多源分散的氣象、地緣、海象與壅塞數據進行清洗與特徵化，為海事大數據提供一站式、標準化的資料基礎設施，屬「已落地實現」之參賽核心。
+* **Open Layer（產品一：智慧資料特徵平台）**：以本章「情報感知層」與「動態推演層之 API 接口」為核心。本團隊已 100% 完成 12 個多維度風險 API 端點的開發、部署與 MVP 實測驗證（開發底層引擎代號為 GreenRoute Engine）。該平台將多源分散的氣象、地緣、海象與壅塞數據進行清洗與特徵化，為海事大數據提供一站式、標準化的資料基礎設施，屬「已落地實現」之參賽核心。
 * **Private Layer（產品二：Agentic 智慧決策核心引擎）**：以本章「監控 Agent」、「分析 Agent」與「決策 Agent」為核心，透過馬可夫決策過程 (MDP) 與多目標最佳化演算法，在私有環境中為航商提供高增值的「動態路線優化」、「裝載力學控制」與「避險決策建議」，此部分屬中長期演進與核心商務邏輯 IP（在報告書中以「理論推導與演算法規劃」呈現，為後續擴充方向）。
 
 透過此雙層架構設計，本系統不僅在技術面上實現了 12 個 Live 運作的 API 實體，更在學術與商業模式上規劃了完整的決策演進藍圖，具備極高的商用落地可行性。</div>
-      </div>
+    </div>
 
-      <!-- 文字 4 -->
-      <div class="copy-box">
-        <div class="copy-header">
-          <span class="copy-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-            【第八章】 10 條標準學術與政策參考文獻 - 補齊空白章節
-          </span>
-          <button class="btn-copy" onclick="copyText('text-references', this)">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path></svg>
-            <span>複製文字</span>
-          </button>
+    <!-- 複製 4 -->
+    <div class="code-box-container">
+        <div class="code-header">
+            <span>4. 【第八章】10 條標準學術與政策參考文獻 (直接貼入第八章即可)</span>
+            <button class="copy-btn" id="btn-copy-4" onclick="copyText('code-4', 'btn-copy-4')">複製文字</button>
         </div>
-        <div id="text-references" class="copy-body">捌、參考文獻
-
-[1] 交通部航港局 (2025)。iMarine 航港發展資料庫平臺。取自 https://www.imarine.gov.tw/
+        <div class="code-box" id="code-4">[1] 交通部航港局 (2025)。iMarine 航港發展資料庫平臺。取自 https://www.imarine.gov.tw/
 [2] 國際海事組織 (IMO) (2023)。2023年國際海事組織溫室氣體減排戰略 (2023 IMO GHG Strategy)。倫敦：IMO。
 [3] 歐盟委員會 (European Commission) (2023)。將航運納入歐盟碳排放交易體系 (EU ETS for Maritime Transport)。布魯塞爾：EC。
 [4] IMF PortWatch Platform (2024). Global Maritime Chokepoint and Congestion Monitoring Database. International Monetary Fund.
@@ -902,446 +657,155 @@
 [8] Fagerholt, K. et al. (2015). Maritime routing and scheduling with weather routing and speed optimization. Transportation Research Part C: Emerging Technologies, 52, 57-73.
 [9] Psaraftis, H. N., & Kontovas, C. A. (2013). Speed models for energy-efficient maritime transportation. Transportation Research Part C: Emerging Technologies, 33, 20-31.
 [10] United Nations Conference on Trade and Development (UNCTAD) (2024). Review of Maritime Transport 2024. Geneva: UNCTAD.</div>
-      </div>
-
     </div>
 
-    <!-- 12大 API 看板 -->
-    <h2 class="section-title">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
-      🎛️ 12大 API 特徵與端點看板 (已完成並驗證)
-    </h2>
+    <!-- 📝 大會必備兩大附表填寫指南 -->
+    <h2 class="section-title" id="tables-sec">📝 大會必備兩大附表填寫指南</h2>
     
-    <div class="api-grid">
-      <!-- API 1 -->
-      <div class="api-card">
-        <div class="api-card-header">
-          <span class="api-endpoint">GET /risk/weather</span>
-          <div class="api-status-indicator"><span class="status-dot"></span></div>
-        </div>
-        <div>
-          <div class="api-card-title">即時與預報氣象 API</div>
-          <div class="api-card-desc">動態獲取台美航線關鍵點氣象數據，支援颱風路徑判定。</div>
-        </div>
-        <div class="api-tags"><span class="api-tag">CWA</span><span class="api-tag">Open-Meteo</span></div>
-      </div>
-
-      <!-- API 2 -->
-      <div class="api-card">
-        <div class="api-card-header">
-          <span class="api-endpoint">GET /risk/weather/archive</span>
-          <div class="api-status-indicator"><span class="status-dot"></span></div>
-        </div>
-        <div>
-          <div class="api-card-title">歷史氣象大數據 API</div>
-          <div class="api-card-desc">回溯 10+ 年以上之歷史氣象特徵，建立路徑風險基準。</div>
-        </div>
-        <div class="api-tags"><span class="api-tag">Weather Archive</span></div>
-      </div>
-
-      <!-- API 3 -->
-      <div class="api-card">
-        <div class="api-card-header">
-          <span class="api-endpoint">GET /risk/ocean</span>
-          <div class="api-status-indicator"><span class="status-dot"></span></div>
-        </div>
-        <div>
-          <div class="api-card-title">即時海洋海象 API</div>
-          <div class="api-card-desc">整合波高、海流、暴潮與海溫，校正船舶流體阻力係數。</div>
-        </div>
-        <div class="api-tags"><span class="api-tag">IOTH</span><span class="api-tag">NOAA</span></div>
-      </div>
-
-      <!-- API 4 -->
-      <div class="api-card">
-        <div class="api-card-header">
-          <span class="api-endpoint">GET /risk/ocean/ports</span>
-          <div class="api-status-indicator"><span class="status-dot"></span></div>
-        </div>
-        <div>
-          <div class="api-card-title">台灣五港即時海象 API</div>
-          <div class="api-card-desc">串接臺灣五大商港即時海象，供近岸調度決策支援。</div>
-        </div>
-        <div class="api-tags"><span class="api-tag">IOTH</span><span class="api-tag">港務資料</span></div>
-      </div>
-
-      <!-- API 5 -->
-      <div class="api-card">
-        <div class="api-card-header">
-          <span class="api-endpoint">GET /risk/ocean/buoys</span>
-          <div class="api-status-indicator"><span class="status-dot"></span></div>
-        </div>
-        <div>
-          <div class="api-card-title">CWA 85站波浪浮標 API</div>
-          <div class="api-card-desc">高頻即時監控台海周邊 85 個氣象署浮標觀測動態。</div>
-        </div>
-        <div class="api-tags"><span class="api-tag">CWA O-B0075</span></div>
-      </div>
-
-      <!-- API 6 -->
-      <div class="api-card">
-        <div class="api-card-header">
-          <span class="api-endpoint">GET /risk/ocean/uscg-ports</span>
-          <div class="api-status-indicator"><span class="status-dot"></span></div>
-        </div>
-        <div>
-          <div class="api-card-title">美西港口開放狀態 API</div>
-          <div class="api-card-desc">即時抓取美國海岸防衛隊航行通告，判定美西港口管制。</div>
-        </div>
-        <div class="api-tags"><span class="api-tag">USCG navcen</span></div>
-      </div>
-
-      <!-- API 7 -->
-      <div class="api-card">
-        <div class="api-card-header">
-          <span class="api-endpoint">GET /risk/chokepoint</span>
-          <div class="api-status-indicator"><span class="status-dot"></span></div>
-        </div>
-        <div>
-          <div class="api-card-title">全球 28 瓶頸點概況 API</div>
-          <div class="api-card-desc">監控巴拿馬、蘇伊士運河等 28 個全球海事要道。</div>
-        </div>
-        <div class="api-tags"><span class="api-tag">IMF PortWatch</span></div>
-      </div>
-
-      <!-- API 8 -->
-      <div class="api-card">
-        <div class="api-card-header">
-          <span class="api-endpoint">GET /risk/chokepoint/{id}</span>
-          <div class="api-status-indicator"><span class="status-dot"></span></div>
-        </div>
-        <div>
-          <div class="api-card-title">單一要道 7 日壅塞 API</div>
-          <div class="api-card-desc">回傳特定要道 7 日運能與延誤，支援動態「跳港」判定。</div>
-        </div>
-        <div class="api-tags"><span class="api-tag">Chokepoint Flow</span></div>
-      </div>
-
-      <!-- API 9 -->
-      <div class="api-card">
-        <div class="api-card-header">
-          <span class="api-endpoint">GET /risk/geo</span>
-          <div class="api-status-indicator"><span class="status-dot"></span></div>
-        </div>
-        <div>
-          <div class="api-card-title">地緣政治風險 API</div>
-          <div class="api-card-desc">整合制裁清單、軍事警告與保險除外區域，量化地緣風險。</div>
-        </div>
-        <div class="api-tags"><span class="api-tag">OFAC</span><span class="api-tag">NGA</span><span class="api-tag">MND</span></div>
-      </div>
-
-      <!-- API 10 -->
-      <div class="api-card">
-        <div class="api-card-header">
-          <span class="api-endpoint">POST /constraint/risk</span>
-          <div class="api-status-indicator"><span class="status-dot"></span></div>
-        </div>
-        <div>
-          <div class="api-card-title">風險約束條件輸入 API</div>
-          <div class="api-card-desc">允許航商自訂各分量風險閾值，實現人機協作 (HIL)。</div>
-        </div>
-        <div class="api-tags"><span class="api-tag">HIL Constraint</span></div>
-      </div>
-
-      <!-- API 11 -->
-      <div class="api-card">
-        <div class="api-card-header">
-          <span class="api-endpoint">GET /constraint/defaults</span>
-          <div class="api-status-indicator"><span class="status-dot"></span></div>
-        </div>
-        <div>
-          <div class="api-card-title">預設風險閾值查詢 API</div>
-          <div class="api-card-desc">提供系統標準之氣象、地緣、海象與壅塞判定安全界限。</div>
-        </div>
-        <div class="api-tags"><span class="api-tag">System Defaults</span></div>
-      </div>
-
-      <!-- API 12 -->
-      <div class="api-card">
-        <div class="api-card-header">
-          <span class="api-endpoint">GET /feature/risk_score</span>
-          <div class="api-status-indicator"><span class="status-dot"></span></div>
-        </div>
-        <div>
-          <div class="api-card-title">四分量加權風險評分 API</div>
-          <div class="api-card-desc">特徵工程核心：整合氣象、海象、地緣、要道，輸出 0-1 評分。</div>
-        </div>
-        <div class="api-tags"><span class="api-tag">Feature Store</span><span class="api-tag">Core</span></div>
-      </div>
-
-    </div>
-
-    <!-- 大會兩大附表視覺化 -->
-    <h2 class="section-title">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-      📝 大會必備兩大附表填寫指南
-    </h2>
-
-    <div class="glass-card">
-      <h3 style="font-size: 1.1rem; color: var(--cyan); margin-bottom: 15px;">1. 資料運用來源細節表 (iMarine 專屬對照 - 佔分 10%)</h3>
-      <div class="table-container">
-        <table>
-          <thead>
+    <h3>1. 「資料運用來源細節表」填寫範本 (iMarine 專屬，佔分 10%)</h3>
+    <table>
+        <thead>
             <tr>
-              <th style="width: 8%">項次</th>
-              <th style="width: 25%">iMarine 資料名稱</th>
-              <th style="width: 15%">引用章節</th>
-              <th style="width: 12%">建議頁碼</th>
-              <th style="width: 40%">於本作品之應用說明</th>
+                <th style="width: 8%">項次</th>
+                <th style="width: 25%">iMarine 資料名稱</th>
+                <th style="width: 15%">引用章節</th>
+                <th style="width: 12%">預估頁碼</th>
+                <th>於本作品之應用說明</th>
             </tr>
-          </thead>
-          <tbody>
+        </thead>
+        <tbody>
             <tr>
-              <td>1</td>
-              <td style="color: #fff; font-weight: 500;">全球航運指數 — 世界燃油價格 (WBP)</td>
-              <td>肆、二、(一)</td>
-              <td>頁 8-9</td>
-              <td>作為系統經濟結算模組之低硫燃油基準盤價，校正路徑避險油耗成本。</td>
+                <td>1</td>
+                <td>全球航運指數 — 世界燃油價格 (WBP)</td>
+                <td>肆、二、(一)</td>
+                <td>頁 8-9</td>
+                <td>作為系統經濟結算模組之低硫燃油基準盤價，校正各路線避險的油耗與碳稅成本。</td>
             </tr>
             <tr>
-              <td>2</td>
-              <td style="color: #fff; font-weight: 500;">快捷查詢/港口 — 國際商港貨櫃裝卸量</td>
-              <td>貳、一、(一) ; 肆、二、(一)</td>
-              <td>頁 3, 頁 9</td>
-              <td>評估臺灣四大港戰略暴露價值權重，量化地緣政治事件的潛在經濟損害。</td>
+                <td>2</td>
+                <td>快捷查詢/港口 — 國際商港貨櫃裝卸量</td>
+                <td>貳、一、(一) ； 肆、二、(一)</td>
+                <td>頁 3、頁 9</td>
+                <td>作為評估臺灣四大港戰略暴露價值的權重，用以量化地緣政治事件之供應鏈暴露價值。</td>
             </tr>
             <tr>
-              <td>3</td>
-              <td style="color: #fff; font-weight: 500;">簡易查詢/船舶 — 24小時泊靠時間分析</td>
-              <td>肆、二、(一)</td>
-              <td>頁 9</td>
-              <td>作為港口常態性等待時間基準，與即時數據比對派生壅塞風險指數。</td>
+                <td>3</td>
+                <td>簡易查詢/船舶 — 24小時泊靠時間分析</td>
+                <td>肆、二、(一)</td>
+                <td>頁 9</td>
+                <td>作為港口常態性泊靠等待時間基準，與即時數據比對派生壅塞風險指數。</td>
             </tr>
             <tr>
-              <td>4</td>
-              <td style="color: #fff; font-weight: 500;">快捷查詢/船舶 — 進出臺灣各國際商港船舶</td>
-              <td>肆、二、(一)</td>
-              <td>頁 9-10</td>
-              <td>關聯 shipping.db 補齊 25,617 筆船舶特徵，提供自適應模型物理約束。</td>
+                <td>4</td>
+                <td>快捷查詢/船舶 — 進出臺灣各國際商港船舶</td>
+                <td>肆、二、(一)</td>
+                <td>頁 9-10</td>
+                <td>提供船舶基本靜態與物理特徵（載重噸、船型），作為自適應最佳化模型的約束參數。</td>
             </tr>
-          </tbody>
-        </table>
-      </div>
+        </tbody>
+    </table>
 
-      <h3 style="font-size: 1.1rem; color: var(--cyan); margin-bottom: 15px; margin-top: 30px;">2. AI 運用細節表 (Gemini/Claude 使用實績 - 佔分 5%)</h3>
-      <div class="table-container">
-        <table>
-          <thead>
+    <br>
+    <h3>2. 「AI 運用細節表」填寫範本 (佔分 5%)</h3>
+    <table>
+        <thead>
             <tr>
-              <th style="width: 25%">使用之 AI 工具</th>
-              <th style="width: 35%">應用場景與使用比例</th>
-              <th style="width: 40%">提升效率與成效之具體實績</th>
+                <th style="width: 20%">項目</th>
+                <th>填寫內容範本</th>
             </tr>
-          </thead>
-          <tbody>
+        </thead>
+        <tbody>
             <tr>
-              <td style="color: #fff; font-weight: 500; vertical-align: top; padding-top: 15px;">
-                Gemini 3.5 Flash (Medium)<br>
-                Claude 3.5 Sonnet
-              </td>
-              <td>
-                <ul>
-                  <li style="margin-bottom: 6px;"><b>數據採集與 ETL 開發 (40%)</b>：編寫優化 15+ 爬蟲清洗腳本。</li>
-                  <li style="margin-bottom: 6px;"><b>特徵工程與架構設計 (30%)</b>：規劃「四分量加權公式」與 DDD 微服務拓撲。</li>
-                  <li><b>報告書編校與學術潤飾 (30%)</b>：重塑第三人稱語法，補齊參考文獻與合規審核。</li>
-                </ul>
-              </td>
-              <td style="vertical-align: top; padding-top: 15px;">
-                1. 將原需耗時數週的多源異質數據清洗與介面封裝時間，縮短至數天內完成，效率提升顯著。<br>
-                2. 於報告撰寫階段，自動檢出合規性隱私漏洞（如封面測試隊名、匿名規範），完全規避了因合規問題遭大會扣分或取消資格的潛在風險。
-              </td>
+                <td><strong>使用之 AI 工具</strong></td>
+                <td>Gemini 3.5 Flash (Medium)、Claude 3.5 Sonnet</td>
             </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+            <tr>
+                <td><strong>應用場景與使用比例</strong></td>
+                <td>
+                    1. <strong>數據採集與 ETL 管線開發 (40%)</strong>：協助編寫與優化 15+ 個多源海事環境 API 的 Python 爬蟲與清洗腳本，解決 CWA 浮標大寫響應、USCG HTML 網頁結構穩定解析等問題，大幅提升代碼穩健度。<br>
+                    2. <strong>系統架構與特徵工程設計 (30%)</strong>：協助設計「四分量加權風險評估公式 (v3)」，並提供 DDD 微服務架構與非同步事件驅動機制的拓撲規劃。<br>
+                    3. <strong>報告書編校與學術潤飾 (30%)</strong>：協助將原始口語草稿進行學術化重塑與科技報告第三人稱語法重寫，並協助補齊第八章參考文獻與排版校對。
+                </td>
+            </tr>
+            <tr>
+                <td><strong>提升效率與具體實績</strong></td>
+                <td>
+                    - 將原需耗時數週的多源異質數據清洗與介面封裝時間，縮短至數天內完成。<br>
+                    - 在報告書撰寫階段，自動檢出合規性隱私漏洞（如封面垃圾文字、匿名規範），避免了預賽因合規問題被取消資格的風險，顯著提升了參賽作品的專業度與誠信度。
+                </td>
+            </tr>
+        </tbody>
+    </table>
 
-    <!-- 6天倒數 Checklist -->
-    <h2 class="section-title">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-      📋 預賽提交前最終修訂 Checklist (6天倒數)
-    </h2>
+</div>
 
-    <div class="checklist-container">
-      
-      <!-- 欄位 1 -->
-      <div class="checklist-column">
-        <h3>
-          <span>📅 Day 1-2：安全合規與正名</span>
-          <span class="column-badge">基礎修訂</span>
-        </h3>
-        
-        <label class="checklist-item">
-          <input type="checkbox" class="task-checkbox" onchange="updateProgress()">
-          <span class="checkmark"></span>
-          <span class="checklist-text">封面隱私合規：徹底刪除「參賽隊伍」這整行垃圾文字，封面採白底黑字保持完全匿名。</span>
-        </label>
-        
-        <label class="checklist-item">
-          <input type="checkbox" class="task-checkbox" onchange="updateProgress()">
-          <span class="checkmark"></span>
-          <span class="checklist-text">全文正名：搜尋並將「GreenRoute AI」與「OceanAI」統一正名為「Ocean AI」（將 GreenRoute 標為底層引擎代號）。</span>
-        </label>
-
-        <label class="checklist-item">
-          <input type="checkbox" class="task-checkbox" onchange="updateProgress()">
-          <span class="checkmark"></span>
-          <span class="checklist-text">修正 API 數量：將報告中「11個API」統一修正為「12個已實作且通過驗證的API端點」。</span>
-        </label>
-
-        <label class="checklist-item">
-          <input type="checkbox" class="task-checkbox" onchange="updateProgress()">
-          <span class="checkmark"></span>
-          <span class="checklist-text">清理草稿痕跡：利用取代工具，清除全文中所有的 "(?)"、備忘註解與拼寫錯誤（如 Phycial -> Physical）。</span>
-        </label>
-      </div>
-
-      <!-- 欄位 2 -->
-      <div class="checklist-column">
-        <h3>
-          <span>📅 Day 3-4：學術內涵補齊</span>
-          <span class="column-badge">核心搶分</span>
-        </h3>
-        
-        <label class="checklist-item">
-          <input type="checkbox" class="task-checkbox" onchange="updateProgress()">
-          <span class="checkmark"></span>
-          <span class="checklist-text">植入 iMarine 段落：在第四章核心採用數據的最後，貼入白皮書提供的 800 字 iMarine 四大數據整合專段。</span>
-        </label>
-
-        <label class="checklist-item">
-          <input type="checkbox" class="task-checkbox" onchange="updateProgress()">
-          <span class="checkmark"></span>
-          <span class="checklist-text">植入雙層定位：在第五章開頭貼入雙層聲明，界定 Open Layer 實作與 Private Layer 規劃，規避技術吹噓扣分。</span>
-        </label>
-
-        <label class="checklist-item">
-          <input type="checkbox" class="task-checkbox" onchange="updateProgress()">
-          <span class="checkmark"></span>
-          <span class="checklist-text">補齊參考文獻：將白皮書提供的 10 條標準學術文獻複製貼入原本完全空白的第八章（捌、參考文獻）。</span>
-        </label>
-
-        <label class="checklist-item">
-          <input type="checkbox" class="task-checkbox" onchange="updateProgress()">
-          <span class="checkmark"></span>
-          <span class="checklist-text">補充完整摘要：在目錄前頁補上白皮書為 Ocean AI 撰寫好的 320 字精美摘要（含背景、方法與效益）。</span>
-        </label>
-      </div>
-
-      <!-- 欄位 3 -->
-      <div class="checklist-column">
-        <h3>
-          <span>📅 Day 5-6：排版美化與提交</span>
-          <span class="column-badge">完美收尾</span>
-        </h3>
-        
-        <label class="checklist-item">
-          <input type="checkbox" class="task-checkbox" onchange="updateProgress()">
-          <span class="checkmark"></span>
-          <span class="checklist-text">排版與行高合規：確認 Word 字型為標楷體、標題 16pt、內文 14pt、固定行高 20pt，符合大會硬性規範。</span>
-        </label>
-
-        <label class="checklist-item">
-          <input type="checkbox" class="task-checkbox" onchange="updateProgress()">
-          <span class="checkmark"></span>
-          <span class="checklist-text">圖表樣式與目錄：將 ASCII 圖表轉為正式 Word Table，並手動/自動更新目錄中的「圖目錄」與「表目錄」。</span>
-        </label>
-
-        <label class="checklist-item">
-          <input type="checkbox" class="task-checkbox" onchange="updateProgress()">
-          <span class="checkmark"></span>
-          <span class="checklist-text">附表填寫：依本看板視覺化內容，完成並列印填寫「資料運用來源細節表」與「AI 運用細節表」。</span>
-        </label>
-
-        <label class="checklist-item">
-          <input type="checkbox" class="task-checkbox" onchange="updateProgress()">
-          <span class="checkmark"></span>
-          <span class="checklist-text">輸出 PDF 驗證：轉換報告為單一 PDF 檔（小於 30MB），確認無洩密資訊後正式上傳大會報名系統！</span>
-        </label>
-      </div>
-
-    </div>
-
-    <!-- 頁尾 -->
-    <footer>
-      Ocean AI 專案管理工具 · 系統分析助理 Antigravity 整合構建 · 預祝團隊金榜題名
-    </footer>
-
-  </div>
-
-  <script>
-    // JS 互動邏輯
-
-    // 1. 卡片內部頁籤切換
-    function switchTab(button, contentId) {
-      // 獲取該卡片下的所有 Tab 和內容
-      const card = button.closest('.compliance-card');
-      const tabs = card.querySelectorAll('.card-tab');
-      const contents = card.querySelectorAll('.tab-content');
-      
-      // 取消所有 active 狀態並隱藏內容
-      tabs.forEach(t => t.classList.remove('active'));
-      contents.forEach(c => c.classList.add('hidden'));
-      
-      // 啟用當前 Tab 並顯示對應內容
-      button.classList.add('active');
-      const targetContent = card.querySelector('#' + contentId);
-      if (targetContent) {
-        targetContent.classList.remove('hidden');
-      }
-    }
-
-    // 2. 一鍵複製功能 (利用 Clipboard API)
-    function copyText(elementId, button) {
-      const element = document.getElementById(elementId);
-      if (!element) return;
-      
-      const textToCopy = element.textContent;
-      
-      navigator.clipboard.writeText(textToCopy).then(() => {
-        // 成功複製的 UI 動畫
-        button.classList.add('copied');
-        const iconSpan = button.querySelector('span');
-        const originalText = iconSpan.textContent;
-        iconSpan.textContent = '已複製！✓';
-        
-        setTimeout(() => {
-          button.classList.remove('copied');
-          iconSpan.textContent = originalText;
-        }, 2000);
-      }).catch(err => {
-        console.error('複製失敗: ', err);
-        alert('複製失敗，請手動複製！');
-      });
-    }
-
-    // 3. Checklist 與頂部進度條連動邏輯
-    function updateProgress() {
-      const checkboxes = document.querySelectorAll('.task-checkbox');
-      const progressBar = document.getElementById('progressBar');
-      const progressPercent = document.getElementById('progressPercent');
-      
-      const totalTasks = checkboxes.length;
-      let checkedCount = 0;
-      
-      checkboxes.forEach(cb => {
-        if (cb.checked) {
-          checkedCount++;
+<script>
+    // 捲動到指定 ID 位置
+    function scrollToId(id) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth' });
         }
-      });
-      
-      const percent = totalTasks > 0 ? Math.round((checkedCount / totalTasks) * 100) : 0;
-      
-      // 動態更新進度條寬度與文字
-      progressBar.style.width = percent + '%';
-      progressPercent.textContent = percent + '%';
     }
 
-    // 網頁初始狀態計算
-    window.addEventListener('DOMContentLoaded', () => {
-      // 隨機勾選兩個作為初始範例 (可留給使用者完全空白勾選，此處設為 0 以供真實協作)
-      updateProgress();
-    });
-  </script>
+    // 勾選變更卡片狀態
+    function toggleCard(id) {
+        const card = document.getElementById('card-' + id);
+        const chk = document.getElementById('chk-' + id);
+        if (chk.checked) {
+            card.classList.add('resolved');
+        } else {
+            card.classList.remove('resolved');
+        }
+        updateProgress();
+    }
+
+    // 更新進度條與計數器
+    function updateProgress() {
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        const total = checkboxes.length;
+        let checkedCount = 0;
+        
+        checkboxes.forEach(chk => {
+            if (chk.checked) {
+                checkedCount++;
+            }
+        });
+
+        const percent = Math.round((checkedCount / total) * 100);
+        
+        document.getElementById('progress-label').innerText = `已修正：${checkedCount} / ${total}`;
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-percent').innerText = percent + '%';
+    }
+
+    // 一鍵複製文字功能
+    function copyText(codeId, btnId) {
+        const codeElement = document.getElementById(codeId);
+        const btn = document.getElementById(btnId);
+        
+        // 取得要複製的文字內容
+        let textToCopy = codeElement.innerText || codeElement.textContent;
+        
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            btn.innerText = '已複製！✓';
+            btn.classList.add('copied');
+            
+            setTimeout(() => {
+                btn.innerText = '複製文字';
+                btn.classList.remove('copied');
+            }, 1500);
+        }).catch(err => {
+            console.error('複製失敗: ', err);
+            alert('複製失敗，請手動複製！');
+        });
+    }
+
+    // 頁面初始化
+    window.onload = function() {
+        updateProgress();
+    };
+</script>
+
 </body>
 </html>
